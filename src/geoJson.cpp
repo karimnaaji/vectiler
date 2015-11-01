@@ -1,10 +1,12 @@
 #include "geoJson.h"
+#include "glm/glm.hpp"
 
 void GeoJson::extractPoint(const rapidjson::Value& _in) {
     
     //glm::dvec2 tmp = _tile.getProjection()->LonLatToMeters(glm::dvec2(_in[0].GetDouble(), _in[1].GetDouble()));
     //_out.x = (tmp.x - _tile.getOrigin().x) * _tile.getInverseScale();
     //_out.y = (tmp.y - _tile.getOrigin().y) * _tile.getInverseScale();
+
     std::cout << _in[0].GetDouble() << " " << _in[1].GetDouble() << std::endl;
 }
 
