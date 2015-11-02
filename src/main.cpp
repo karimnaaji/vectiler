@@ -5,20 +5,20 @@
 
 #include "rapidjson/document.h"
 #include "geojson.h"
+#include "tileData.h"
 
 static size_t write_data(void *_ptr, size_t _size, size_t _nmemb, void *_stream) {
     ((std::stringstream*) _stream)->write(reinterpret_cast<char *>(_ptr), _size * _nmemb);
     return _size * _nmemb;
 }
 
-void downloadTile(const std::string& _url) {
+std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _tile) {
     bool success = true;
 
     CURL* curlHandle = curl_easy_init();
 
     std::stringstream out;
-    
-    
+
     // set up curl to perform fetch
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
@@ -44,19 +44,25 @@ void downloadTile(const std::string& _url) {
 
         if (doc.HasParseError()) {
             std::cout << "Error parsing" << std::endl;
-            return;
+            return nullptr;
         }
 
+        std::unique_ptr<TileData> data = std::make_unique<TileData>();
         for (auto layer = doc.MemberBegin(); layer != doc.MemberEnd(); ++layer) {
-            //tileData->layers.emplace_back(std::string(layer->name.GetString()));
-            GeoJson::extractLayer(layer->value/*, tileData->layers.back(), _tile*/);
+            std::cout << "Extracting layer " << layer->name.GetString() << std::endl;
+            data->layers.emplace_back(std::string(layer->name.GetString()));
+            GeoJson::extractLayer(layer->value, data->layers.back(), _tile);
         }
+
+        return std::move(data);
     }
+
+    return nullptr;
 }
 
 int main() {
-    int tileX = 19293;
-    int tileY = 24641;
+    int tileX = 19294;
+    int tileY = 24642;
     int tileZ = 16;
 
     std::string apiKey = "vector-tiles-qVaBcRA";
@@ -67,6 +73,6 @@ int main() {
 
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
-    downloadTile(url);
+    auto data = downloadTile(url, { tileX, tileY, tileZ });
 
 }
