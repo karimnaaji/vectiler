@@ -28,9 +28,9 @@ make
 
 # Pipeline 
 
-- [ ] Download the tile
-- [ ] Normalize the positions from lat/lon to [-1.0 1.0] relative to tile coordinate
-- [ ] Parse the features and store them in a data structure
+- [x] Download the tile
+- [x] Normalize the positions from lat/lon to [-1.0 1.0] relative to tile coordinate
+- [x] Parse the features and store them in a data structure
 - [ ] For each feature, tesselate the normalized polygons / lines (using libtess2)
 - [ ] For each polygon extrude if a height is available
 - [ ] Offset the vertices relative to the "origin" tile, saying that if a set of 3 tiles `[x0,y0]``[x0,y1]``[x1,y0]`
