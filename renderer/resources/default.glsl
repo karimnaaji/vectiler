@@ -10,7 +10,8 @@ out vec2 fuv;
 out vec3 fnormal;
 
 void main() {
-    fuv = uv;
+    // flip uv on y axis
+    fuv = vec2(uv.x, 1.0 - uv.y);
     gl_Position = mvp * vec4(position, 1.0);
 }
 #pragma end:vertex

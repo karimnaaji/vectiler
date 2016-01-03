@@ -18,7 +18,7 @@ class Renderer : public App {
 OGLWMain(Renderer);
 
 void Renderer::init() {
-    m_camera.setPosition({0.0, -0.5, 10.0});
+    m_camera.setPosition({0.0, 0.0, 10.0});
     m_camera.setNear(5.0);
     m_camera.setFar(15.0);
     m_shader = make_unique<Shader>("default.glsl");
