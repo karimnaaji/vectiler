@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
-project(objexport-renderer)
+project(objexport-viewer)
 
-set(EXECUTABLE_NAME renderer-ao)
+set(EXECUTABLE_NAME viewer)
 
 # c++14 flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++1y")

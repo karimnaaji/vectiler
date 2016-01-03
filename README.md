@@ -1,6 +1,6 @@
 # obj-export
 
-A wavefront obj builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles). 
+A wavefront obj builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles).
 
 - build and export mesh in obj files based on tile coordinates (find your tiles of interest [here](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/))
 - bake ambiant occlusion and save it in an atlas (using [aobaker](https://github.com/prideout/aobaker))
@@ -27,7 +27,7 @@ $ brew install embree tbb cmake
 
 To build with cmake in a `build/` directory run the following:
 ```sh
-$ cmake . -Bbuild  
+$ cmake . -Bbuild
 $ cmake --build build
 ```
 
@@ -51,7 +51,7 @@ $ cmake --build build
 ```sh
 ./objexport --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
-Output is: 
+Output is:
 - `[tilex].[tiley].[tilez].obj`: a simple mesh containing coordinates and normals
 - `[tilex].[tiley].[tilez]-ao.obj` a mesh containing coordinates and texture uvs for ambiant occlusion rendering
 - `[tilex].[tiley].[tilez].png`: an atlas containing the baked ambiant occlusion.
@@ -62,8 +62,8 @@ A minimal viewer using [oglw](https://github.com/karimnaaji/oglw) can be used to
 
 ```sh
 $ cd renderer
-$ cmake . -Bbuild  
+$ cmake . -Bbuild
 $ cmake --build build
-$ open build/renderer-ao.app
+$ open viewer.app --args ~/dev/obj-export/build/19294.24642.16-ao.obj ~/dev/obj-export/build/19294.24642.16.png
 ```
 
