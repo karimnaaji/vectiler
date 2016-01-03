@@ -225,7 +225,6 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
 }
 
 int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples) {
-{
     std::string apiKey = "vector-tiles-qVaBcRA";
     std::string url = "http://vector.mapzen.com/osm/all/"
         + std::to_string(_tileZ) + "/"
@@ -249,7 +248,7 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
 
     std::vector<PolygonMesh> meshes;
     for (auto layer : data->layers) {
-        if (layer.name == "buildings" || layer.name == "landuse") {
+        //if (layer.name == "buildings" || layer.name == "landuse") {
             for (auto feature : layer.features) {
                 auto itHeight = feature.props.numericProps.find(key_height);
                 auto itMinHeight = feature.props.numericProps.find(key_min_height);
@@ -271,7 +270,7 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
                 }
                 meshes.push_back(mesh);
             }
-        }
+        //}
     }
 
     std::string outFile = std::to_string(_tileX) + "." + std::to_string(_tileY)
