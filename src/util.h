@@ -9,9 +9,9 @@ constexpr static double INV_180 = 1.0 / 180.0;
 constexpr static double HALF_CIRCUMFERENCE = PI * R_EARTH;
 
 struct Tile {
-    unsigned x;
-    unsigned y;
-    unsigned z;
+    int x;
+    int y;
+    int z;
 };
 
 glm::dvec2 lonLatToMeters(const glm::dvec2 _lonLat);
