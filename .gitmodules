@@ -4,3 +4,6 @@
 [submodule "3rdparty/glm"]
 	path = 3rdparty/glm
 	url = git@github.com:g-truc/glm.git
+[submodule "3rdparty/earcut.hpp"]
+	path = 3rdparty/earcut.hpp
+	url = https://github.com/mapbox/earcut.hpp.git
