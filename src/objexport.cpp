@@ -78,7 +78,6 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
 
         std::unique_ptr<TileData> data = std::unique_ptr<TileData>(new TileData());
         for (auto layer = doc.MemberBegin(); layer != doc.MemberEnd(); ++layer) {
-            printf("Extracting layer %s\n", layer->name.GetString());
             data->layers.emplace_back(std::string(layer->name.GetString()));
             GeoJson::extractLayer(layer->value, data->layers.back(), _tile);
         }
@@ -213,12 +212,15 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
             }
         }
         file.close();
+        printf("Save %s\n", _outputOBJ.c_str());
         return true;
     }
     return false;
 }
 
-int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples) {
+int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples,
+        bool _bakeAO)
+{
     std::string apiKey = "vector-tiles-qVaBcRA";
     std::string url = "http://vector.mapzen.com/osm/all/"
         + std::to_string(_tileZ) + "/"
@@ -275,6 +277,10 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
         return EXIT_FAILURE;
     }
 
-    return aobaker_bake(outputOBJ.c_str(), (outFile + "-ao.obj").c_str(), (outFile + ".png").c_str(),
-            _sizehint, _nsamples, false, false, 1.0);
+    if (_bakeAO) {
+        return aobaker_bake(outputOBJ.c_str(), (outFile + "-ao.obj").c_str(),
+                (outFile + ".png").c_str(), _sizehint, _nsamples, false, false, 1.0);
+    }
+
+    return EXIT_SUCCESS;
 }

@@ -8,14 +8,16 @@ int main(int argc, const char **argv) {
     int tileZ = 16;
     int sizehint = 512;
     int nsamples = 256;
-    bool splitMeshes = false;
+    int splitMeshes = 0;
+    int bakeAO = 1;
     flag_usage("[options]");
-    flag_bool(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
+    flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
     flag_int(&tileX, "tilex", "Tile X");
     flag_int(&tileY, "tiley", "Tile Y");
     flag_int(&tileZ, "tilez", "Tile Z");
+    flag_int(&bakeAO, "bakeAO", "Generate ambiant occlusion baked atlas");
     flag_int(&sizehint, "sizehint", "Controls resolution of atlas");
     flag_int(&nsamples, "nsamples", "Quality of ambient occlusion");
     flag_parse(argc, argv, "v" "0.1.0", 0);
-    return objexport(tileX, tileY, tileZ, splitMeshes, sizehint, nsamples);
+    return objexport(tileX, tileY, tileZ, (bool)splitMeshes, sizehint, nsamples, (bool)bakeAO);
 }

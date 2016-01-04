@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples);
+int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples,
+        bool _bakeAO);
 
 #ifdef __cplusplus
 }

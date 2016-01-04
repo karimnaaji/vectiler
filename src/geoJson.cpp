@@ -27,34 +27,33 @@ void GeoJson::extractPoly(const rapidjson::Value& _in, Polygon& _out, const Tile
 
 void GeoJson::extractFeature(const rapidjson::Value& _in, Feature& _out, const Tile& _tile) {
     const rapidjson::Value& properties = _in["properties"];
-    
+
     for (auto itr = properties.MemberBegin(); itr != properties.MemberEnd(); ++itr) {
         const auto& member = itr->name.GetString();
-        std::cout << "\t" << member << std::endl;
         const rapidjson::Value& prop = properties[member];
-        
+
         if (strcmp(member, "height") == 0) {
             _out.props.numericProps[member] = prop.GetDouble();
             continue;
         }
-        
+
         if (strcmp(member, "min_height") == 0) {
             _out.props.numericProps[member] = prop.GetDouble();
             continue;
         }
-        
+
         if (prop.IsNumber()) {
             //_out.props.numericProps[member] = prop.GetDouble();
         } else if (prop.IsString()) {
             //_out.props.stringProps[member] = prop.GetString();
         }
     }
-    
+
     // Copy geometry into tile data
     const rapidjson::Value& geometry = _in["geometry"];
     const rapidjson::Value& coords = geometry["coordinates"];
     const std::string& geometryType = geometry["type"].GetString();
-    
+
     if (geometryType.compare("Point") == 0) {
         _out.geometryType = GeometryType::points;
         _out.points.emplace_back();
@@ -89,9 +88,9 @@ void GeoJson::extractFeature(const rapidjson::Value& _in, Feature& _out, const T
 
 void GeoJson::extractLayer(const rapidjson::Value& _in, Layer& _out, const Tile& _tile) {
     const auto& featureIter = _in.FindMember("features");
-    
+
     if (featureIter == _in.MemberEnd()) {
-        std::cout << "ERROR: GeoJSON missing 'features' member" << std::endl;
+        printf("ERROR: GeoJSON missing 'features' member\n");
         return;
     }
 

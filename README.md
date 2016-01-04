@@ -1,6 +1,6 @@
-# obj-export
+# vectiler
 
-A wavefront obj builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles).
+A wavefront obj vector tile builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles).
 
 - build and export mesh in obj files based on tile coordinates (find your tiles of interest [here](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/))
 - bake ambiant occlusion and save it in an atlas (using [aobaker](https://github.com/prideout/aobaker))
