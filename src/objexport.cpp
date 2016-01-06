@@ -191,6 +191,7 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 }
             }
             for (const PolygonMesh& mesh : _meshes) {
+                if (mesh.vertices.size() == 0) { continue; }
                 for (auto vertex : mesh.vertices) {
                     file << "vn " << vertex.normal.x << " "
                          << vertex.normal.y << " "
@@ -198,6 +199,7 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 }
             }
             for (const PolygonMesh& mesh : _meshes) {
+                if (mesh.vertices.size() == 0) { continue; }
                 for (int i = 0; i < mesh.indices.size(); i += 3) {
                     file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
                          << mesh.indices[i] + indexOffset + 1;
