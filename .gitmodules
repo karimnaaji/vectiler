@@ -1,9 +1,9 @@
 [submodule "3rdparty/rapidjson"]
 	path = 3rdparty/rapidjson
-	url = git@github.com:miloyip/rapidjson.git
+	url = https://github.com/miloyip/rapidjson.git
 [submodule "3rdparty/glm"]
 	path = 3rdparty/glm
-	url = git@github.com:g-truc/glm.git
+	url = https://github.com/g-truc/glm.git
 [submodule "3rdparty/earcut.hpp"]
 	path = 3rdparty/earcut.hpp
 	url = https://github.com/mapbox/earcut.hpp.git
@@ -12,4 +12,4 @@
 	url = https://github.com/prideout/aobaker.git
 [submodule "renderer/oglw"]
 	path = renderer/oglw
-	url = git@github.com:karimnaaji/oglw.git
+	url = https://github.com/karimnaaji/oglw.git
