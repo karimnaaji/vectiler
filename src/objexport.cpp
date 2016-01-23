@@ -149,7 +149,7 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
     }
 }
 
-bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<PolygonMesh> _meshes) {
+bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<PolygonMesh>& _meshes) {
     std::ofstream file(_outputOBJ);
     if (file.is_open()) {
         int indexOffset = 0;

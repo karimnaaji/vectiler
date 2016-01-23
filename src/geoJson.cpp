@@ -54,30 +54,30 @@ void GeoJson::extractFeature(const rapidjson::Value& _in, Feature& _out, const T
     const rapidjson::Value& coords = geometry["coordinates"];
     const std::string& geometryType = geometry["type"].GetString();
 
-    if (geometryType.compare("Point") == 0) {
+    if (geometryType == "Point") {
         _out.geometryType = GeometryType::points;
         _out.points.emplace_back();
         extractPoint(coords, _out.points.back(), _tile);
-    } else if (geometryType.compare("MultiPoint") == 0) {
+    } else if (geometryType == "MultiPoint") {
         _out.geometryType= GeometryType::points;
         for (auto pointCoords = coords.Begin(); pointCoords != coords.End(); ++pointCoords) {
             extractPoint(*pointCoords, _out.points.back(), _tile);
         }
-    } else if (geometryType.compare("LineString") == 0) {
+    } else if (geometryType == "LineString") {
         _out.geometryType = GeometryType::lines;
         _out.lines.emplace_back();
         extractLine(coords, _out.lines.back(), _tile);
-    } else if (geometryType.compare("MultiLineString") == 0) {
+    } else if (geometryType == "MultiLineString") {
         _out.geometryType = GeometryType::lines;
         for (auto lineCoords = coords.Begin(); lineCoords != coords.End(); ++lineCoords) {
             _out.lines.emplace_back();
             extractLine(*lineCoords, _out.lines.back(), _tile);
         }
-    } else if (geometryType.compare("Polygon") == 0) {
+    } else if (geometryType == "Polygon") {
         _out.geometryType = GeometryType::polygons;
         _out.polygons.emplace_back();
         extractPoly(coords, _out.polygons.back(), _tile);
-    } else if (geometryType.compare("MultiPolygon") == 0) {
+    } else if (geometryType == "MultiPolygon") {
         _out.geometryType = GeometryType::polygons;
         for (auto polyCoords = coords.Begin(); polyCoords != coords.End(); ++polyCoords) {
             _out.polygons.emplace_back();
