@@ -5,7 +5,7 @@ A wavefront obj vector tile builder and exporter based on [mapzen](https://mapze
 - build and export mesh in obj files based on tile coordinates (find your tiles of interest [here](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/))
 - bake ambiant occlusion and save it in an atlas (using [aobaker](https://github.com/prideout/aobaker))
 
-![](img/capture.png)
+![](img/vectiler.png)
 
 **fetch submodules**
 
@@ -14,7 +14,7 @@ First initialize submodules by running:
 $ git submodule update --init --recursive
 ```
 
-**Install dependecies (OS X)**
+**install dependecies (OS X)**
 
 aobaker needs [embree](https://embree.github.io/) for optimal ray tracing and tbb, you can install it using [homebrew](http://brew.sh/):
 
@@ -52,7 +52,7 @@ $ cmake --build build
     --help         Output help
 ```
 
-**Example**
+**example**
 
 Download one tile with ambiant occlusion baked in a texture:
 ```sh
