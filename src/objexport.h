@@ -4,7 +4,8 @@
 extern "C" {
 #endif
 
-int objexport(int _tileX,
+int objexport(const char* _filename,
+        int _tileX,
         int _tileY,
         int _tileZ,
         float _offsetX,

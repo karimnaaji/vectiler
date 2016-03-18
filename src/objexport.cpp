@@ -246,7 +246,8 @@ bool saveOBJ(std::string _outputOBJ,
     return false;
 }
 
-int objexport(int _tileX,
+int objexport(const char* _filename,
+    int _tileX,
     int _tileY,
     int _tileZ,
     float _offsetX,
@@ -280,7 +281,8 @@ int objexport(int _tileX,
 
     std::vector<PolygonMesh> meshes;
     for (auto layer : data->layers) {
-        //if (layer.name == "buildings" || layer.name == "landuse") {
+        // TODO: give layer as parameter
+        // if (layer.name == "buildings" || layer.name == "landuse") {
             for (auto feature : layer.features) {
                 auto itHeight = feature.props.numericProps.find(key_height);
                 auto itMinHeight = feature.props.numericProps.find(key_min_height);
@@ -302,11 +304,17 @@ int objexport(int _tileX,
                 }
                 meshes.push_back(mesh);
             }
-        //}
+        // }
     }
 
-    std::string outFile = std::to_string(_tileX) + "." + std::to_string(_tileY)
-        + "." + std::to_string(_tileZ);
+    std::string outFile;
+
+    if (_filename) {
+        outFile = std::string(_filename);
+    } else {
+        outFile = std::to_string(_tileX) + "." + std::to_string(_tileY) + "." + std::to_string(_tileZ);
+    }
+
     std::string outputOBJ = outFile + ".obj";
 
     if (!saveOBJ(outputOBJ, _splitMeshes, meshes, _offsetX, _offsetY, _append, tile)) {
