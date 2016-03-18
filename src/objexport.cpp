@@ -199,6 +199,9 @@ bool saveOBJ(std::string _outputOBJ,
     }
 
     if (file.is_open()) {
+        file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
+        file << "\n";
+
         int indexOffset = maxindex;
 
         if (_splitMeshes) {
