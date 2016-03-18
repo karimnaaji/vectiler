@@ -11,7 +11,7 @@ do
     #for y in {24600..24643}
     for y in {24639..24643}
     do
-        offsety=$((offsety+2))
+        offsety=$((offsety-2))
         #./objexport --tilex $x --tiley $y --tilez 16 --sizehint 128 --nsamples 32
         ./objexport --name manhattan --tilex $x --tiley $y --tilez 16 --offsetx $offsetx --offsety $offsety --append 1
         if [ $? -eq 0 ]; then

@@ -74,7 +74,7 @@ do
     offsety=0
     for y in {24639..24643}
     do
-        offsety=$((offsety+2))
+        offsety=$((offsety-2))
         # --append option will append results to manhattan.obj
         # --offsetx and --offsety will offset the vertices of appended objs
         ./objexport --name manhattan --tilex $x --tiley $y --tilez 16 --offsetx $offsetx --offsety $offsety --append 1
@@ -82,7 +82,7 @@ do
 done
 ```
 
-![](img/big-tile.png)
+![](img/lower-manhattan.png)
 
 **build and run the viewer (OS X)**
 
