@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <limits>
 
 #include "rapidjson/document.h"
 #include "geojson.h"
@@ -157,7 +158,39 @@ bool saveOBJ(std::string _outputOBJ,
     bool _append,
     Tile _tile)
 {
+    std::ifstream filein(_outputOBJ.c_str(), std::ios::in);
     std::ofstream file;
+
+    size_t maxindex = 0;
+
+    std::string token;
+    if (filein.good()) {
+        while (!filein.eof()) {
+            filein >> token;
+            if (token == "f") {
+                std::string faceLine;
+                getline(filein, faceLine);
+
+                for (unsigned int i = 0; i < faceLine.length(); ++i) {
+                    if (faceLine[i] == '/') {
+                        faceLine[i] = ' ';
+                    }
+                }
+
+                std::stringstream ss(faceLine);
+                std::string faceToken;
+
+                for (int i = 0; i < 6; ++i) {
+                    ss >> faceToken;
+                    if (faceToken.find_first_not_of("\t\n ") != std::string::npos) {
+                        size_t index = atoi(faceToken.c_str());
+                        maxindex = index > maxindex ? index : maxindex;
+                    }
+                }
+            }
+        }
+        filein.close();
+    }
 
     if (_append) {
         file = std::ofstream(_outputOBJ, std::ios_base::app);
@@ -166,7 +199,7 @@ bool saveOBJ(std::string _outputOBJ,
     }
 
     if (file.is_open()) {
-        int indexOffset = 0;
+        int indexOffset = maxindex;
 
         if (_splitMeshes) {
             int meshCnt = 0;
