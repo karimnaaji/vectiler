@@ -149,18 +149,36 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
     }
 }
 
-bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<PolygonMesh>& _meshes) {
-    std::ofstream file(_outputOBJ);
+bool saveOBJ(std::string _outputOBJ,
+    bool _splitMeshes,
+    const std::vector<PolygonMesh>& _meshes,
+    float _offsetX,
+    float _offsetY,
+    bool _append,
+    Tile _tile)
+{
+    std::ofstream file;
+
+    if (_append) {
+        file = std::ofstream(_outputOBJ, std::ios_base::app);
+    } else {
+        file = std::ofstream(_outputOBJ);
+    }
+
     if (file.is_open()) {
         int indexOffset = 0;
+
         if (_splitMeshes) {
             int meshCnt = 0;
+
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+                file << "# tile " << _tile.x << " " << _tile.y << " " << _tile.z << "\n";
+
                 file << "o mesh" << meshCnt++ << "\n";
                 for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x << " "
-                         << vertex.position.y << " "
+                    file << "v " << vertex.position.x + _offsetX << " "
+                         << vertex.position.y + _offsetY << " "
                          << vertex.position.z << "\n";
                 }
                 for (auto vertex : mesh.vertices) {
@@ -182,16 +200,20 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 indexOffset += mesh.vertices.size();
             }
         } else {
+            file << "o tile_" << _tile.x << "_" << _tile.y << "_" << _tile.z << "\n";
+
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x << " "
-                         << vertex.position.y << " "
+                    file << "v " << vertex.position.x + _offsetX << " "
+                         << vertex.position.y + _offsetY << " "
                          << vertex.position.z << "\n";
                 }
             }
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (auto vertex : mesh.vertices) {
                     file << "vn " << vertex.normal.x << " "
                          << vertex.normal.y << " "
@@ -200,6 +222,7 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
             }
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (int i = 0; i < mesh.indices.size(); i += 3) {
                     file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
                          << mesh.indices[i] + indexOffset + 1;
@@ -213,15 +236,26 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 indexOffset += mesh.vertices.size();
             }
         }
+
         file.close();
         printf("Save %s\n", _outputOBJ.c_str());
         return true;
+    } else {
+        printf("Can't open file %s", _outputOBJ.c_str());
     }
     return false;
 }
 
-int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples,
-        bool _bakeAO)
+int objexport(int _tileX,
+    int _tileY,
+    int _tileZ,
+    float _offsetX,
+    float _offsetY,
+    bool _splitMeshes,
+    int _sizehint,
+    int _nsamples,
+    bool _bakeAO,
+    bool _append)
 {
     std::string apiKey = "vector-tiles-qVaBcRA";
     std::string url = "http://vector.mapzen.com/osm/all/"
@@ -275,7 +309,7 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
         + "." + std::to_string(_tileZ);
     std::string outputOBJ = outFile + ".obj";
 
-    if (!saveOBJ(outputOBJ, _splitMeshes, meshes)) {
+    if (!saveOBJ(outputOBJ, _splitMeshes, meshes, _offsetX, _offsetY, _append, tile)) {
         return EXIT_FAILURE;
     }
 
