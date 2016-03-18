@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <limits>
 
 #include "rapidjson/document.h"
 #include "geojson.h"
@@ -149,18 +150,68 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
     }
 }
 
-bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<PolygonMesh>& _meshes) {
-    std::ofstream file(_outputOBJ);
+bool saveOBJ(std::string _outputOBJ,
+    bool _splitMeshes,
+    const std::vector<PolygonMesh>& _meshes,
+    float _offsetX,
+    float _offsetY,
+    bool _append,
+    Tile _tile)
+{
+    std::ifstream filein(_outputOBJ.c_str(), std::ios::in);
+    std::ofstream file;
+
+    size_t maxindex = 0;
+
+    std::string token;
+    if (filein.good()) {
+        while (!filein.eof()) {
+            filein >> token;
+            if (token == "f") {
+                std::string faceLine;
+                getline(filein, faceLine);
+
+                for (unsigned int i = 0; i < faceLine.length(); ++i) {
+                    if (faceLine[i] == '/') {
+                        faceLine[i] = ' ';
+                    }
+                }
+
+                std::stringstream ss(faceLine);
+                std::string faceToken;
+
+                for (int i = 0; i < 6; ++i) {
+                    ss >> faceToken;
+                    if (faceToken.find_first_not_of("\t\n ") != std::string::npos) {
+                        size_t index = atoi(faceToken.c_str());
+                        maxindex = index > maxindex ? index : maxindex;
+                    }
+                }
+            }
+        }
+        filein.close();
+    }
+
+    if (_append) {
+        file = std::ofstream(_outputOBJ, std::ios_base::app);
+    } else {
+        file = std::ofstream(_outputOBJ);
+    }
+
     if (file.is_open()) {
-        int indexOffset = 0;
+        int indexOffset = maxindex;
+
         if (_splitMeshes) {
             int meshCnt = 0;
+
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+                file << "# tile " << _tile.x << " " << _tile.y << " " << _tile.z << "\n";
+
                 file << "o mesh" << meshCnt++ << "\n";
                 for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x << " "
-                         << vertex.position.y << " "
+                    file << "v " << vertex.position.x + _offsetX << " "
+                         << vertex.position.y + _offsetY << " "
                          << vertex.position.z << "\n";
                 }
                 for (auto vertex : mesh.vertices) {
@@ -182,16 +233,20 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 indexOffset += mesh.vertices.size();
             }
         } else {
+            file << "o tile_" << _tile.x << "_" << _tile.y << "_" << _tile.z << "\n";
+
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x << " "
-                         << vertex.position.y << " "
+                    file << "v " << vertex.position.x + _offsetX << " "
+                         << vertex.position.y + _offsetY << " "
                          << vertex.position.z << "\n";
                 }
             }
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (auto vertex : mesh.vertices) {
                     file << "vn " << vertex.normal.x << " "
                          << vertex.normal.y << " "
@@ -200,6 +255,7 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
             }
             for (const PolygonMesh& mesh : _meshes) {
                 if (mesh.vertices.size() == 0) { continue; }
+
                 for (int i = 0; i < mesh.indices.size(); i += 3) {
                     file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
                          << mesh.indices[i] + indexOffset + 1;
@@ -213,15 +269,27 @@ bool saveOBJ(std::string _outputOBJ, bool _splitMeshes, const std::vector<Polygo
                 indexOffset += mesh.vertices.size();
             }
         }
+
         file.close();
         printf("Save %s\n", _outputOBJ.c_str());
         return true;
+    } else {
+        printf("Can't open file %s", _outputOBJ.c_str());
     }
     return false;
 }
 
-int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehint, int _nsamples,
-        bool _bakeAO)
+int objexport(const char* _filename,
+    int _tileX,
+    int _tileY,
+    int _tileZ,
+    float _offsetX,
+    float _offsetY,
+    bool _splitMeshes,
+    int _sizehint,
+    int _nsamples,
+    bool _bakeAO,
+    bool _append)
 {
     std::string apiKey = "vector-tiles-qVaBcRA";
     std::string url = "http://vector.mapzen.com/osm/all/"
@@ -246,7 +314,8 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
 
     std::vector<PolygonMesh> meshes;
     for (auto layer : data->layers) {
-        //if (layer.name == "buildings" || layer.name == "landuse") {
+        // TODO: give layer as parameter
+        // if (layer.name == "buildings" || layer.name == "landuse") {
             for (auto feature : layer.features) {
                 auto itHeight = feature.props.numericProps.find(key_height);
                 auto itMinHeight = feature.props.numericProps.find(key_min_height);
@@ -268,14 +337,20 @@ int objexport(int _tileX, int _tileY, int _tileZ, bool _splitMeshes, int _sizehi
                 }
                 meshes.push_back(mesh);
             }
-        //}
+        // }
     }
 
-    std::string outFile = std::to_string(_tileX) + "." + std::to_string(_tileY)
-        + "." + std::to_string(_tileZ);
+    std::string outFile;
+
+    if (_filename) {
+        outFile = std::string(_filename);
+    } else {
+        outFile = std::to_string(_tileX) + "." + std::to_string(_tileY) + "." + std::to_string(_tileZ);
+    }
+
     std::string outputOBJ = outFile + ".obj";
 
-    if (!saveOBJ(outputOBJ, _splitMeshes, meshes)) {
+    if (!saveOBJ(outputOBJ, _splitMeshes, meshes, _offsetX, _offsetY, _append, tile)) {
         return EXIT_FAILURE;
     }
 

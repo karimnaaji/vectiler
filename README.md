@@ -37,10 +37,15 @@ $ cmake --build build
   Usage: ./objexport [options]
 
   Options:
-    --splitMeshes  Generate one mesh per feature in wavefront file
+    --name         File name ((null))
+    --splitMeshes  Generate one mesh per feature in wavefront file (0)
     --tilex        Tile X (19294)
     --tiley        Tile Y (24642)
     --tilez        Tile Z (16)
+    --offsetx      Tile Offset on X coordinate (0.0)
+    --offsety      Tile Offset on Y coordinate (0.0)
+    --bakeAO       Generate ambiant occlusion baked atlas (0)
+    --append       Append the obj to an existing obj file (0)
     --sizehint     Controls resolution of atlas (512)
     --nsamples     Quality of ambient occlusion (256)
     --version      Output version
@@ -48,13 +53,36 @@ $ cmake --build build
 ```
 
 **Example**
+
+Download one tile with ambiant occlusion baked in a texture:
 ```sh
 ./objexport --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
-Output is:
+Output files are:
 - `[tilex].[tiley].[tilez].obj`: a simple mesh containing coordinates and normals
-- `[tilex].[tiley].[tilez]-ao.obj` a mesh containing coordinates and texture uvs for ambiant occlusion rendering
-- `[tilex].[tiley].[tilez].png`: an atlas containing the baked ambiant occlusion.
+- `[tilex].[tiley].[tilez]-ao.obj`: a mesh containing coordinates and texture uvs for ambiant occlusion rendering
+- `[tilex].[tiley].[tilez].png`: an atlas containing the baked ambiant occlusion
+
+Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
+```sh
+#!/bin/bash
+
+offsetx=0
+for x in {19293..19298}
+do
+    offsetx=$((offsetx+2))
+    offsety=0
+    for y in {24639..24643}
+    do
+        offsety=$((offsety+2))
+        # --append option will append results to manhattan.obj
+        # --offsetx and --offsety will offset the vertices of appended objs
+        ./objexport --name manhattan --tilex $x --tiley $y --tilez 16 --offsetx $offsetx --offsety $offsety --append 1
+    done
+done
+```
+
+![](img/big-tile.png)
 
 **build and run the viewer (OS X)**
 
