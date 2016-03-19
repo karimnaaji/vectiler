@@ -134,6 +134,8 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
 
     unsigned int vertexDataOffset = _vertices.size();
 
+    if (earcut.indices.size() == 0) return;
+
     if (vertexDataOffset == 0) {
         _indices = std::move(earcut.indices);
     } else {
