@@ -166,7 +166,8 @@ bool saveOBJ(std::string _outputOBJ,
     size_t maxindex = 0;
 
     std::string token;
-    if (filein.good()) {
+    if (filein.good() && _append) {
+        // TODO: optimize this
         while (!filein.eof()) {
             filein >> token;
             if (token == "f") {
