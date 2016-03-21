@@ -13,10 +13,10 @@ int main(int argc, const char **argv) {
     int splitMeshes = 0;
     int bakeAO = 0;
     int append = 0;
-    const char* str[99999] = { 0 };
+    const char* name = NULL;
 
     flag_usage("[options]");
-    flag_string(str, "name", "File name");
+    flag_string(&name, "name", "File name");
     flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
     flag_int(&tileX, "tilex", "Tile X");
     flag_int(&tileY, "tiley", "Tile Y");
@@ -29,7 +29,7 @@ int main(int argc, const char **argv) {
     flag_int(&nsamples, "nsamples", "Quality of ambient occlusion");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    return objexport(str[0],
+    return objexport(&name[0],
             tileX,
             tileY,
             tileZ,
