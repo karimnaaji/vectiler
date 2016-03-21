@@ -89,8 +89,11 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
     return nullptr;
 }
 
-void buildPolygonExtrusion(const Polygon& _polygon, double _minHeight, double _height,
-    std::vector<PolygonVertex>& _vertices, std::vector<unsigned int>& _indices)
+void buildPolygonExtrusion(const Polygon& _polygon,
+    double _minHeight,
+    double _height,
+    std::vector<PolygonVertex>& _vertices,
+    std::vector<unsigned int>& _indices)
 {
     int vertexDataOffset = _vertices.size();
     glm::vec3 upVector(0.0f, 0.0f, 1.0f);
@@ -102,8 +105,11 @@ void buildPolygonExtrusion(const Polygon& _polygon, double _minHeight, double _h
             glm::vec3 a(line[i]);
             glm::vec3 b(line[i+1]);
 
+            if (a == b) { continue; }
+
             normalVector = glm::cross(upVector, b - a);
             normalVector = glm::normalize(normalVector);
+
             a.z = _height;
             _vertices.push_back({a, normalVector});
             b.z = _height;
@@ -144,6 +150,7 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
             _indices.push_back(vertexDataOffset + i);
         }
     }
+
     static glm::vec3 normal(0.0, 0.0, 1.0);
 
     for (auto& p : earcut.vertices) {
@@ -154,133 +161,165 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
 
 bool saveOBJ(std::string _outputOBJ,
     bool _splitMeshes,
-    const std::vector<PolygonMesh>& _meshes,
+    std::vector<PolygonMesh>& _meshes,
     float _offsetX,
     float _offsetY,
     bool _append,
     Tile _tile)
 {
-    std::ifstream filein(_outputOBJ.c_str(), std::ios::in);
-    std::ofstream file;
+
+    /// Cleanup mesh from degenerate points
+    {
+        for (auto& mesh : _meshes) {
+            if (mesh.indices.size() == 0) continue;
+
+            int i = 0;
+            for (auto it = mesh.indices.begin(); it < mesh.indices.end() - 2;) {
+                glm::vec3 p0 = mesh.vertices[mesh.indices[i+0]].position;
+                glm::vec3 p1 = mesh.vertices[mesh.indices[i+1]].position;
+                glm::vec3 p2 = mesh.vertices[mesh.indices[i+2]].position;
+
+                if (p0 == p1 || p0 == p2) {
+                    for (int j = 0; j < 3; ++j) {
+                        it = mesh.indices.erase(it);
+                    }
+                } else {
+                    it += 3;
+                }
+
+                i += 3;
+            }
+        }
+    }
 
     size_t maxindex = 0;
 
-    std::string token;
-    if (filein.good() && _append) {
-        // TODO: optimize this
-        while (!filein.eof()) {
-            filein >> token;
-            if (token == "f") {
-                std::string faceLine;
-                getline(filein, faceLine);
+    /// Find max index from previously existing wavefront vertices
+    {
+        std::ifstream filein(_outputOBJ.c_str(), std::ios::in);
+        std::string token;
 
-                for (unsigned int i = 0; i < faceLine.length(); ++i) {
-                    if (faceLine[i] == '/') {
-                        faceLine[i] = ' ';
+        if (filein.good() && _append) {
+            // TODO: optimize this
+            while (!filein.eof()) {
+                filein >> token;
+                if (token == "f") {
+                    std::string faceLine;
+                    getline(filein, faceLine);
+
+                    for (unsigned int i = 0; i < faceLine.length(); ++i) {
+                        if (faceLine[i] == '/') {
+                            faceLine[i] = ' ';
+                        }
                     }
-                }
 
-                std::stringstream ss(faceLine);
-                std::string faceToken;
+                    std::stringstream ss(faceLine);
+                    std::string faceToken;
 
-                for (int i = 0; i < 6; ++i) {
-                    ss >> faceToken;
-                    if (faceToken.find_first_not_of("\t\n ") != std::string::npos) {
-                        size_t index = atoi(faceToken.c_str());
-                        maxindex = index > maxindex ? index : maxindex;
+                    for (int i = 0; i < 6; ++i) {
+                        ss >> faceToken;
+                        if (faceToken.find_first_not_of("\t\n ") != std::string::npos) {
+                            size_t index = atoi(faceToken.c_str());
+                            maxindex = index > maxindex ? index : maxindex;
+                        }
                     }
                 }
             }
+
+            filein.close();
         }
-        filein.close();
     }
 
-    if (_append) {
-        file = std::ofstream(_outputOBJ, std::ios_base::app);
-    } else {
-        file = std::ofstream(_outputOBJ);
-    }
-
-    if (file.is_open()) {
-        file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
-        file << "\n";
-
-        int indexOffset = maxindex;
-
-        if (_splitMeshes) {
-            int meshCnt = 0;
-
-            for (const PolygonMesh& mesh : _meshes) {
-                if (mesh.vertices.size() == 0) { continue; }
-                file << "# tile " << _tile.x << " " << _tile.y << " " << _tile.z << "\n";
-
-                file << "o mesh" << meshCnt++ << "\n";
-                for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x + _offsetX << " "
-                         << vertex.position.y + _offsetY << " "
-                         << vertex.position.z << "\n";
-                }
-                for (auto vertex : mesh.vertices) {
-                    file << "vn " << vertex.normal.x << " "
-                         << vertex.normal.y << " "
-                         << vertex.normal.z << "\n";
-                }
-                for (int i = 0; i < mesh.indices.size(); i += 3) {
-                    file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
-                         << mesh.indices[i] + indexOffset + 1;
-                    file << " ";
-                    file << mesh.indices[i+1] + indexOffset + 1 << "//"
-                         << mesh.indices[i+1] + indexOffset + 1;
-                    file << " ";
-                    file << mesh.indices[i+2] + indexOffset + 1 << "//"
-                         << mesh.indices[i+2] + indexOffset + 1 << "\n";
-                }
-                file << "\n";
-                indexOffset += mesh.vertices.size();
-            }
+    /// Save obj file
+    {
+        std::ofstream file;
+        if (_append) {
+            file = std::ofstream(_outputOBJ, std::ios_base::app);
         } else {
-            file << "o tile_" << _tile.x << "_" << _tile.y << "_" << _tile.z << "\n";
-
-            for (const PolygonMesh& mesh : _meshes) {
-                if (mesh.vertices.size() == 0) { continue; }
-
-                for (auto vertex : mesh.vertices) {
-                    file << "v " << vertex.position.x + _offsetX << " "
-                         << vertex.position.y + _offsetY << " "
-                         << vertex.position.z << "\n";
-                }
-            }
-            for (const PolygonMesh& mesh : _meshes) {
-                if (mesh.vertices.size() == 0) { continue; }
-
-                for (auto vertex : mesh.vertices) {
-                    file << "vn " << vertex.normal.x << " "
-                         << vertex.normal.y << " "
-                         << vertex.normal.z << "\n";
-                }
-            }
-            for (const PolygonMesh& mesh : _meshes) {
-                if (mesh.vertices.size() == 0) { continue; }
-
-                for (int i = 0; i < mesh.indices.size(); i += 3) {
-                    file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
-                         << mesh.indices[i] + indexOffset + 1;
-                    file << " ";
-                    file << mesh.indices[i+1] + indexOffset + 1 << "//"
-                         << mesh.indices[i+1] + indexOffset + 1;
-                    file << " ";
-                    file << mesh.indices[i+2] + indexOffset + 1 << "//"
-                         << mesh.indices[i+2] + indexOffset + 1 << "\n";
-                }
-                indexOffset += mesh.vertices.size();
-            }
+            file = std::ofstream(_outputOBJ);
         }
 
-        file.close();
-        printf("Save %s\n", _outputOBJ.c_str());
-        return true;
-    } else {
-        printf("Can't open file %s", _outputOBJ.c_str());
+        if (file.is_open()) {
+            file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
+            file << "\n";
+
+            int indexOffset = maxindex;
+
+            if (_splitMeshes) {
+                int meshCnt = 0;
+
+                for (const PolygonMesh& mesh : _meshes) {
+                    if (mesh.vertices.size() == 0) { continue; }
+                    file << "# tile " << _tile.x << " " << _tile.y << " " << _tile.z << "\n";
+
+                    file << "o mesh" << meshCnt++ << "\n";
+                    for (auto vertex : mesh.vertices) {
+                        file << "v " << vertex.position.x + _offsetX << " "
+                             << vertex.position.y + _offsetY << " "
+                             << vertex.position.z << "\n";
+                    }
+                    for (auto vertex : mesh.vertices) {
+                        file << "vn " << vertex.normal.x << " "
+                             << vertex.normal.y << " "
+                             << vertex.normal.z << "\n";
+                    }
+                    for (int i = 0; i < mesh.indices.size(); i += 3) {
+                        file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
+                             << mesh.indices[i] + indexOffset + 1;
+                        file << " ";
+                        file << mesh.indices[i+1] + indexOffset + 1 << "//"
+                             << mesh.indices[i+1] + indexOffset + 1;
+                        file << " ";
+                        file << mesh.indices[i+2] + indexOffset + 1 << "//"
+                             << mesh.indices[i+2] + indexOffset + 1 << "\n";
+                    }
+                    file << "\n";
+                    indexOffset += mesh.vertices.size();
+                }
+            } else {
+                file << "o tile_" << _tile.x << "_" << _tile.y << "_" << _tile.z << "\n";
+
+                for (const PolygonMesh& mesh : _meshes) {
+                    if (mesh.vertices.size() == 0) { continue; }
+
+                    for (auto vertex : mesh.vertices) {
+                        file << "v " << vertex.position.x + _offsetX << " "
+                             << vertex.position.y + _offsetY << " "
+                             << vertex.position.z << "\n";
+                    }
+                }
+                for (const PolygonMesh& mesh : _meshes) {
+                    if (mesh.vertices.size() == 0) { continue; }
+
+                    for (auto vertex : mesh.vertices) {
+                        file << "vn " << vertex.normal.x << " "
+                             << vertex.normal.y << " "
+                             << vertex.normal.z << "\n";
+                    }
+                }
+                for (const PolygonMesh& mesh : _meshes) {
+                    if (mesh.vertices.size() == 0) { continue; }
+
+                    for (int i = 0; i < mesh.indices.size(); i += 3) {
+                        file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
+                             << mesh.indices[i] + indexOffset + 1;
+                        file << " ";
+                        file << mesh.indices[i+1] + indexOffset + 1 << "//"
+                             << mesh.indices[i+1] + indexOffset + 1;
+                        file << " ";
+                        file << mesh.indices[i+2] + indexOffset + 1 << "//"
+                             << mesh.indices[i+2] + indexOffset + 1 << "\n";
+                    }
+                    indexOffset += mesh.vertices.size();
+                }
+            }
+
+            file.close();
+            printf("Save %s\n", _outputOBJ.c_str());
+            return true;
+        } else {
+            printf("Can't open file %s", _outputOBJ.c_str());
+        }
     }
     return false;
 }
@@ -320,30 +359,28 @@ int objexport(const char* _filename,
 
     std::vector<PolygonMesh> meshes;
     for (auto layer : data->layers) {
-        // TODO: give layer as parameter
-        // if (layer.name == "buildings" || layer.name == "landuse") {
-            for (auto feature : layer.features) {
-                auto itHeight = feature.props.numericProps.find(key_height);
-                auto itMinHeight = feature.props.numericProps.find(key_min_height);
-                double height = 0.0;
-                double minHeight = 0.0;
-                if (itHeight != feature.props.numericProps.end()) {
-                    height = itHeight->second * invScale;
-                }
-                if (itMinHeight != feature.props.numericProps.end()) {
-                    minHeight = itMinHeight->second * invScale;
-                }
-                PolygonMesh mesh;
-                for (auto polygon : feature.polygons) {
-                    if (minHeight != height) {
-                        buildPolygonExtrusion(polygon, minHeight, height,
-                            mesh.vertices, mesh.indices);
-                    }
-                    buildPolygon(polygon, height, mesh.vertices, mesh.indices);
-                }
-                meshes.push_back(mesh);
+        // TODO: give layer as parameter, to filter
+        for (auto feature : layer.features) {
+            auto itHeight = feature.props.numericProps.find(key_height);
+            auto itMinHeight = feature.props.numericProps.find(key_min_height);
+            double height = 0.0;
+            double minHeight = 0.0;
+            if (itHeight != feature.props.numericProps.end()) {
+                height = itHeight->second * invScale;
             }
-        // }
+            if (itMinHeight != feature.props.numericProps.end()) {
+                minHeight = itMinHeight->second * invScale;
+            }
+            PolygonMesh mesh;
+            for (auto polygon : feature.polygons) {
+                if (minHeight != height) {
+                    buildPolygonExtrusion(polygon, minHeight, height,
+                        mesh.vertices, mesh.indices);
+                }
+                buildPolygon(polygon, height, mesh.vertices, mesh.indices);
+            }
+            meshes.push_back(mesh);
+        }
     }
 
     std::string outFile;
