@@ -101,6 +101,10 @@ void buildPolygonExtrusion(const Polygon& _polygon,
 
     for (auto& line : _polygon) {
         size_t lineSize = line.size();
+
+        _vertices.reserve(_vertices.size() + lineSize * 4);
+        _indices.reserve(_indices.size() + lineSize * 6);
+
         for (size_t i = 0; i < lineSize - 1; i++) {
             glm::vec3 a(line[i]);
             glm::vec3 b(line[i+1]);
@@ -131,7 +135,9 @@ void buildPolygonExtrusion(const Polygon& _polygon,
     }
 }
 
-void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVertex>& _vertices,
+void buildPolygon(const Polygon& _polygon,
+    double _height,
+    std::vector<PolygonVertex>& _vertices,
     std::vector<unsigned int>& _indices)
 {
     mapbox::Earcut<float, unsigned int> earcut;
@@ -152,6 +158,8 @@ void buildPolygon(const Polygon& _polygon, double _height, std::vector<PolygonVe
     }
 
     static glm::vec3 normal(0.0, 0.0, 1.0);
+
+    _vertices.reserve(_vertices.size() + earcut.vertices.size());
 
     for (auto& p : earcut.vertices) {
         glm::vec3 coord(p[0], p[1], _height);
@@ -354,15 +362,15 @@ int objexport(const char* _filename,
     double scale = 0.5 * glm::abs(bounds.x - bounds.z);
     double invScale = 1.0 / scale;
 
-    const static std::string key_height("height");
-    const static std::string key_min_height("min_height");
+    const static std::string keyHeight("height");
+    const static std::string keyMinHeight("min_height");
 
     std::vector<PolygonMesh> meshes;
     for (auto layer : data->layers) {
         // TODO: give layer as parameter, to filter
         for (auto feature : layer.features) {
-            auto itHeight = feature.props.numericProps.find(key_height);
-            auto itMinHeight = feature.props.numericProps.find(key_min_height);
+            auto itHeight = feature.props.numericProps.find(keyHeight);
+            auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
             double height = 0.0;
             double minHeight = 0.0;
             if (itHeight != feature.props.numericProps.end()) {
