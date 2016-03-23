@@ -29,6 +29,12 @@ int main(int argc, const char **argv) {
     flag_int(&nsamples, "nsamples", "Quality of ambient occlusion");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
+    if (append && bakeAO) {
+        printf("Can't use options --append and --bakeAO altogether");
+        printf("Those option are currently exclusive");
+        return EXIT_FAILURE;
+    }
+
     return objexport(&name[0],
             tileX,
             tileY,
