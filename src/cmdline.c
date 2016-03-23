@@ -14,9 +14,11 @@ int main(int argc, const char **argv) {
     int bakeAO = 0;
     int append = 0;
     const char* name = NULL;
+    const char* apiKey = NULL;
 
     flag_usage("[options]");
     flag_string(&name, "name", "File name");
+    flag_string(&apiKey, "apikey", "Developer API key (https://mapzen.com/developers/)");
     flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
     flag_int(&tileX, "tilex", "Tile X");
     flag_int(&tileY, "tiley", "Tile Y");
@@ -36,6 +38,7 @@ int main(int argc, const char **argv) {
     }
 
     return objexport(&name[0],
+            &apiKey[0],
             tileX,
             tileY,
             tileZ,

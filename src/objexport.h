@@ -5,6 +5,7 @@ extern "C" {
 #endif
 
 int objexport(const char* _filename,
+        const char* _apiKey,
         int _tileX,
         int _tileY,
         int _tileZ,

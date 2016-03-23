@@ -333,6 +333,7 @@ bool saveOBJ(std::string _outputOBJ,
 }
 
 int objexport(const char* _filename,
+    const char* _apiKey,
     int _tileX,
     int _tileY,
     int _tileZ,
@@ -344,7 +345,14 @@ int objexport(const char* _filename,
     bool _bakeAO,
     bool _append)
 {
-    std::string apiKey = "vector-tiles-qVaBcRA";
+    std::string apiKey;
+
+    if (!_apiKey) {
+        apiKey = "vector-tiles-qVaBcRA";
+    } else {
+        apiKey = std::string(_apiKey);
+    }
+
     std::string url = "http://vector.mapzen.com/osm/all/"
         + std::to_string(_tileZ) + "/"
         + std::to_string(_tileX) + "/"
