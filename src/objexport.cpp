@@ -8,26 +8,22 @@
 #include "rapidjson/document.h"
 #include "geojson.h"
 #include "tileData.h"
-#include "earcut.hpp"
 #include "objexport.h"
 #include "aobaker.h"
+#include "earcut.h"
 
-namespace mapbox {
-namespace util {
-template <>
-struct nth<0, Point> {
-    inline static float get(const Point &t) { return t.x; };
-};
-
-template <>
-struct nth<1, Point> {
-    inline static float get(const Point &t) { return t.y; };
-};
-}}
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 struct PolygonVertex {
     glm::vec3 position;
     glm::vec3 normal;
+};
+
+struct HeightData {
+    std::vector<std::vector<float>> elevation;
+    int width;
+    int height;
 };
 
 struct PolygonMesh {
@@ -40,18 +36,18 @@ static size_t write_data(void *_ptr, size_t _size, size_t _nmemb, void *_stream)
     return _size * _nmemb;
 }
 
-std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _tile) {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-
-    bool success = true;
+bool downloadData(std::stringstream& _out, const std::string& _url) {
+    static bool curlInitialized = false;
+    if (!curlInitialized) {
+        curl_global_init(CURL_GLOBAL_DEFAULT);
+        curlInitialized = true;
+    }
 
     CURL* curlHandle = curl_easy_init();
 
-    std::stringstream out;
-
     // set up curl to perform fetch
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &_out);
     curl_easy_setopt(curlHandle, CURLOPT_URL, _url.c_str());
     curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
     curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
@@ -63,9 +59,65 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
     CURLcode result = curl_easy_perform(curlHandle);
 
     if (result != CURLE_OK) {
-        printf("curl_easy_perform failed: %s\n", curl_easy_strerror(result));
-        success = false;
+        printf("Curl download failure: %s\n", curl_easy_strerror(result));
     } else {
+        printf("Downloaded data from url: %s\n", _url.c_str());
+    }
+
+    return result == CURLE_OK;
+}
+
+std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& _url, const Tile& _tile) {
+    std::stringstream out;
+
+    if (downloadData(out, _url)) {
+        unsigned char* pixels;
+        int width, height, comp;
+
+        pixels = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(out.str().c_str()),
+            out.str().length(), &width, &height, &comp, STBI_rgb_alpha);
+
+        printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
+
+        assert(comp == STBI_rgb_alpha);
+
+        std::unique_ptr<HeightData> data = std::unique_ptr<HeightData>(new HeightData());
+
+        data->elevation.resize(height);
+        for (int i = 0; i < height; ++i) {
+            data->elevation[i].resize(width);
+        }
+
+        data->width = width;
+        data->height = height;
+
+        unsigned char* pixel = pixels;
+        for (size_t i = 0; i < width * height; i++, pixel += 4) {
+            float red =   *(pixel+0);
+            float green = *(pixel+1);
+            float blue =  *(pixel+2);
+
+            // Decode the elevation packed data from color component
+            float elevation = (red * 256 + green + blue / 256) - 32768;
+
+            int x = i / height;
+            int y = i % width;
+
+            assert(x >= 0 && x <= height && y >= 0 && y <= width);
+
+            data->elevation[x][y] = elevation;
+        }
+
+        return std::move(data);
+    }
+
+    return nullptr;
+}
+
+std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _tile) {
+    std::stringstream out;
+
+    if (downloadData(out, _url)) {
         printf("Fetched tile: %s\n", _url.c_str());
 
         // parse written data into a JSON object
@@ -87,6 +139,47 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
     }
 
     return nullptr;
+}
+
+void buildPlane(std::vector<PolygonVertex>& _vertices,
+    std::vector<unsigned int>& _indices,
+    float _width,       // Total plane width (x-axis)
+    float _height,      // Total plane height (y-axis)
+    unsigned int _nw,   // Split on width
+    unsigned int _nh)   // Split on height
+{
+    std::vector<glm::vec4> vertices;
+    std::vector<int> indices;
+
+    int indexOffset = 0;
+
+    float ow = _width / _nw;
+    float oh = _height / _nh;
+
+    for (float w = -_width / 2.0; w <= _width / 2.0 - ow; w += ow) {
+        for (float h = -_height / 2.0; h <= _height / 2.0 - oh; h += oh) {
+            glm::vec3 v0(w, h + oh, 0.0);
+            glm::vec3 v1(w, h, 0.0);
+            glm::vec3 v2(w + ow, h, 0.0);
+            glm::vec3 v3(w + ow, h + oh, 0.0);
+
+            static const glm::vec3 up(0.0, 0.0, 1.0);
+
+            _vertices.push_back({v0, up});
+            _vertices.push_back({v1, up});
+            _vertices.push_back({v2, up});
+            _vertices.push_back({v3, up});
+
+            _indices.push_back(indexOffset+0);
+            _indices.push_back(indexOffset+1);
+            _indices.push_back(indexOffset+2);
+            _indices.push_back(indexOffset+0);
+            _indices.push_back(indexOffset+2);
+            _indices.push_back(indexOffset+3);
+
+            indexOffset += 4;
+        }
+    }
 }
 
 void buildPolygonExtrusion(const Polygon& _polygon,
@@ -123,12 +216,12 @@ void buildPolygonExtrusion(const Polygon& _polygon,
             b.z = _minHeight;
             _vertices.push_back({b, normalVector});
 
-            _indices.push_back(vertexDataOffset);
-            _indices.push_back(vertexDataOffset + 1);
-            _indices.push_back(vertexDataOffset + 2);
-            _indices.push_back(vertexDataOffset + 1);
-            _indices.push_back(vertexDataOffset + 3);
-            _indices.push_back(vertexDataOffset + 2);
+            _indices.push_back(vertexDataOffset+0);
+            _indices.push_back(vertexDataOffset+1);
+            _indices.push_back(vertexDataOffset+2);
+            _indices.push_back(vertexDataOffset+1);
+            _indices.push_back(vertexDataOffset+3);
+            _indices.push_back(vertexDataOffset+2);
 
             vertexDataOffset += 4;
         }
@@ -353,22 +446,104 @@ int objexport(const char* _filename,
         apiKey = std::string(_apiKey);
     }
 
-    std::string url = "http://vector.mapzen.com/osm/all/"
-        + std::to_string(_tileZ) + "/"
-        + std::to_string(_tileX) + "/"
-        + std::to_string(_tileY) + ".json?api_key=" + apiKey;
+    bool terrain = true;
+    //Tile tile = {_tileX, _tileY, _tileZ};
+    Tile tile = {664, 1583, 12};
+    std::string url;
 
-    Tile tile = {_tileX, _tileY, _tileZ};
+    if (!terrain) {
+        url = "http://vector.mapzen.com/osm/all/"
+            + std::to_string(tile.z) + "/"
+            + std::to_string(tile.x) + "/"
+            + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+    } else {
+        url = "https://terrain-preview.mapzen.com/terrarium/"
+            + std::to_string(tile.z) + "/"
+            + std::to_string(tile.x) + "/"
+            + std::to_string(tile.y) + ".png";
+    }
+
+    std::unique_ptr<HeightData> textureData = downloadHeightmapTile(url, tile);
+
+    assert(textureData != nullptr);
+
+    PolygonMesh m;
+
+    /// Build terrain mesh
+    {
+        // Extract a plane geometry, vertices in [-1.0,1.0]
+        // With a resolution of 512 * 512 vertices
+        buildPlane(m.vertices, m.indices, 2.0, 2.0, 512, 512);
+
+        // Build terrain mesh extrusion, with bilinear height sampling
+        for (auto& vertex : m.vertices) {
+            // Normalize vertex coordinates into the texture coordinates range
+            float u = (vertex.position.x * 0.5f + 0.5f) * textureData->width;
+            float v = (vertex.position.y * 0.5f + 0.5f) * textureData->height;
+
+            float alpha = u - floor(u);
+            float beta  = v - floor(v);
+
+            int ii0 = floor(u);
+            int jj0 = floor(v);
+            int ii1 = ii0 + 1;
+            int jj1 = jj0 + 1;
+
+            // Clamp on borders
+            ii0 = std::min(ii0, textureData->width - 1);
+            jj0 = std::min(jj0, textureData->height -1);
+            ii1 = std::min(ii1, textureData->width - 1);
+            jj1 = std::min(jj1, textureData->height - 1);
+
+            // Sample four corners of the current texel
+            float s0 = textureData->elevation[ii0][jj0];
+            float s1 = textureData->elevation[ii0][jj1];
+            float s2 = textureData->elevation[ii1][jj0];
+            float s3 = textureData->elevation[ii1][jj1];
+
+            // Sample the bilinear height from the elevation texture
+            float bilinearHeight = (1 - beta) * (1 - alpha) * s0
+                                 + (1 - beta) * alpha       * s1
+                                 + beta       * (1 - alpha) * s2
+                                 + alpha      * beta        * s3;
+
+            // Scale the height within the tile scale
+            vertex.position.z = bilinearHeight * tile.invScale;
+        }
+
+        // Compute faces normals
+        for (size_t i = 0; i < m.indices.size(); i += 3) {
+            int i1 = m.indices[i+0];
+            int i2 = m.indices[i+1];
+            int i3 = m.indices[i+2];
+
+            const glm::vec3& v1 = m.vertices[i1].position;
+            const glm::vec3& v2 = m.vertices[i2].position;
+            const glm::vec3& v3 = m.vertices[i3].position;
+
+            glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+
+            m.vertices[i1].normal += d;
+            m.vertices[i2].normal += d;
+            m.vertices[i3].normal += d;
+        }
+
+        for (auto& v : m.vertices) {
+            v.normal = glm::normalize(v.normal);
+        }
+    }
+
+    std::vector<PolygonMesh> mes = {m};
+    saveOBJ("meshtest.obj", false, mes, 0, 0, false, tile);
+
+    return 0;
+
     auto data = downloadTile(url, tile);
 
     if (!data) {
         printf("Failed to download tile data\n");
         return EXIT_FAILURE;
     }
-
-    glm::dvec4 bounds = tileBounds(tile, 256.0);
-    double scale = 0.5 * glm::abs(bounds.x - bounds.z);
-    double invScale = 1.0 / scale;
 
     const static std::string keyHeight("height");
     const static std::string keyMinHeight("min_height");
@@ -382,10 +557,10 @@ int objexport(const char* _filename,
             double height = 0.0;
             double minHeight = 0.0;
             if (itHeight != feature.props.numericProps.end()) {
-                height = itHeight->second * invScale;
+                height = itHeight->second * tile.invScale;
             }
             if (itMinHeight != feature.props.numericProps.end()) {
-                minHeight = itMinHeight->second * invScale;
+                minHeight = itMinHeight->second * tile.invScale;
             }
             PolygonMesh mesh;
             for (auto polygon : feature.polygons) {
