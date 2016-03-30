@@ -3,7 +3,9 @@
 struct Params {
     const char* filename;
     const char* apiKey;
-    int tile[3];
+    const char* tilex;
+    const char* tiley;
+    int tilez;
     float offset[2];
     bool splitMesh;
     int aoSizeHint;

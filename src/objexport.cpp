@@ -148,6 +148,7 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
     unsigned int nw,   // Split on width
     unsigned int nh)   // Split on height
 {
+    // TODO: add offsets
     std::vector<glm::vec4> vertices;
     std::vector<int> indices;
 
@@ -186,7 +187,8 @@ void buildPolygonExtrusion(const Polygon& polygon,
     double _minHeight,
     double height,
     std::vector<PolygonVertex>& outVertices,
-    std::vector<unsigned int>& outIndices)
+    std::vector<unsigned int>& outIndices,
+    glm::vec2 offset)
 {
     int vertexDataOffset = outVertices.size();
     glm::vec3 upVector(0.0f, 0.0f, 1.0f);
@@ -201,6 +203,11 @@ void buildPolygonExtrusion(const Polygon& polygon,
         for (size_t i = 0; i < lineSize - 1; i++) {
             glm::vec3 a(line[i]);
             glm::vec3 b(line[i+1]);
+
+            a.x += offset.x;
+            a.y += offset.y;
+            b.x += offset.y;
+            b.y += offset.y;
 
             if (a == b) { continue; }
 
@@ -231,7 +238,8 @@ void buildPolygonExtrusion(const Polygon& polygon,
 void buildPolygon(const Polygon& polygon,
     double height,
     std::vector<PolygonVertex>& outVertices,
-    std::vector<unsigned int>& outIndices)
+    std::vector<unsigned int>& outIndices,
+    glm::vec2 offset)
 {
     mapbox::Earcut<float, unsigned int> earcut;
 
@@ -255,7 +263,7 @@ void buildPolygon(const Polygon& polygon,
     outVertices.reserve(outVertices.size() + earcut.vertices.size());
 
     for (auto& p : earcut.vertices) {
-        glm::vec3 coord(p[0], p[1], height);
+        glm::vec3 coord(p[0] + offset.x, p[1] + offset.y, height);
         outVertices.push_back({coord, normal});
     }
 }
@@ -265,8 +273,7 @@ bool saveOBJ(std::string outputOBJ,
     std::vector<PolygonMesh>& meshes,
     float offsetx,
     float offsety,
-    bool append,
-    Tile tile)
+    bool append)
 {
 
     /// Cleanup mesh from degenerate points
@@ -351,7 +358,6 @@ bool saveOBJ(std::string outputOBJ,
 
                 for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
-                    file << "# tile " << tile.x << " " << tile.y << " " << tile.z << "\n";
 
                     file << "o mesh" << meshCnt++ << "\n";
                     for (auto vertex : mesh.vertices) {
@@ -378,7 +384,7 @@ bool saveOBJ(std::string outputOBJ,
                     indexOffset += mesh.vertices.size();
                 }
             } else {
-                file << "o tile_" << tile.x << "_" << tile.y << "_" << tile.z << "\n";
+                //file << "o tile_" << tile.x << "_" << tile.y << "_" << tile.z << "\n";
 
                 for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
@@ -425,22 +431,72 @@ bool saveOBJ(std::string outputOBJ,
     return false;
 }
 
-int objexport(Params exportParams) {
-    std::string apiKey;
+std::vector<std::string> splitString(const std::string& s, char delim) {
+    std::vector<std::string> elems;
+    std::stringstream ss(s);
+    std::string item;
 
-    if (!exportParams.apiKey) {
-        apiKey = "vector-tiles-qVaBcRA";
-    } else {
-        apiKey = std::string(exportParams.apiKey);
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
     }
 
-    Tile tile = {exportParams.tile[0], exportParams.tile[1], exportParams.tile[2]};
-    std::string url;
+    return elems;
+}
 
-    url = "http://vector.mapzen.com/osm/all/"
-        + std::to_string(tile.z) + "/"
-        + std::to_string(tile.x) + "/"
-        + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+bool extractTileRange(int* start, int* end, const std::string& range) {
+    std::vector<std::string> tilesRange = splitString(range, '/');
+
+    if (tilesRange.size() > 2 || tilesRange.size() == 0) {
+        return false;
+    }
+
+    if (tilesRange.size() == 2) {
+        *start = std::stoi(tilesRange[0]);
+        *end = std::stoi(tilesRange[1]);
+    } else {
+        *start = *end = std::stoi(tilesRange[0]);
+    }
+
+    if (*end < *start) {
+        return false;
+    }
+
+    return true;
+}
+
+int objexport(Params exportParams) {
+    std::string apiKey(exportParams.apiKey);
+
+    printf("Using API key %s\n", exportParams.apiKey);
+
+    std::vector<Tile> tiles;
+
+    /// Parse tile params
+    {
+        int startx, starty, endx, endy;
+
+        if (!extractTileRange(&startx, &endx, std::string(exportParams.tilex))) {
+            printf("Bad param: %s", exportParams.tilex);
+            return EXIT_FAILURE;
+        }
+
+        if (!extractTileRange(&starty, &endy, std::string(exportParams.tiley))) {
+            printf("Bad param: %s", exportParams.tiley);
+            return EXIT_FAILURE;
+        }
+
+        for (size_t x = startx; x <= endx; ++x) {
+            for (size_t y = starty; y <= endy; ++y) {
+                tiles.emplace_back(x, y, exportParams.tilez);
+            }
+        }
+    }
+
+    if (tiles.size() == 0) {
+        printf("No tiles to download");
+        return EXIT_FAILURE;
+    }
+
 #if 0
     bool terrain = true;
     Tile tile = {664, 1583, 12};
@@ -533,50 +589,60 @@ int objexport(Params exportParams) {
     return 0;
 #endif
 
-    auto data = downloadTile(url, tile);
-
-    if (!data) {
-        printf("Failed to download tile data\n");
-        return EXIT_FAILURE;
-    }
-
-    const static std::string keyHeight("height");
-    const static std::string keyMinHeight("min_height");
-
     std::vector<PolygonMesh> meshes;
-    for (auto layer : data->layers) {
-        // TODO: give layer as parameter, to filter
-        for (auto feature : layer.features) {
-            auto itHeight = feature.props.numericProps.find(keyHeight);
-            auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
-            double height = 0.0;
-            double minHeight = 0.0;
 
-            if (itHeight != feature.props.numericProps.end()) {
-                height = itHeight->second * tile.invScale;
-            }
+    glm::vec2 offset;
+    Tile origin = tiles[0];
 
-            if (itMinHeight != feature.props.numericProps.end()) {
-                minHeight = itMinHeight->second * tile.invScale;
-            }
+    for (auto tile : tiles) {
+        std::string url;
 
-            PolygonMesh mesh;
-            for (auto polygon : feature.polygons) {
-                if (minHeight != height) {
-                    buildPolygonExtrusion(polygon, minHeight, height,
-                        mesh.vertices, mesh.indices);
-                }
-                buildPolygon(polygon, height, mesh.vertices, mesh.indices);
-            }
+        offset.x =  (tile.x - origin.x) * 2;
+        offset.y = -(tile.y - origin.y) * 2;
 
-            meshes.push_back(mesh);
+        url = "http://vector.mapzen.com/osm/all/"
+            + std::to_string(tile.z) + "/"
+            + std::to_string(tile.x) + "/"
+            + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+
+        auto data = downloadTile(url, tile);
+
+        if (!data) {
+            printf("Failed to download tile data\n");
+            return EXIT_FAILURE;
         }
-    }
 
-    // Early exit
-    if (meshes.size() == 0) {
-        printf("No output mesh for tile %d %d %d", tile.x, tile.y, tile.z);
-        return EXIT_SUCCESS;
+        const static std::string keyHeight("height");
+        const static std::string keyMinHeight("min_height");
+
+        for (auto layer : data->layers) {
+            // TODO: give layer as parameter, to filter
+            for (auto feature : layer.features) {
+                auto itHeight = feature.props.numericProps.find(keyHeight);
+                auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
+                double height = 0.0;
+                double minHeight = 0.0;
+
+                if (itHeight != feature.props.numericProps.end()) {
+                    height = itHeight->second * tile.invScale;
+                }
+
+                if (itMinHeight != feature.props.numericProps.end()) {
+                    minHeight = itMinHeight->second * tile.invScale;
+                }
+
+                PolygonMesh mesh;
+                for (auto polygon : feature.polygons) {
+                    if (minHeight != height) {
+                        buildPolygonExtrusion(polygon, minHeight, height,
+                            mesh.vertices, mesh.indices, offset);
+                    }
+                    buildPolygon(polygon, height, mesh.vertices, mesh.indices, offset);
+                }
+
+                meshes.push_back(mesh);
+            }
+        }
     }
 
     std::string outFile;
@@ -584,9 +650,10 @@ int objexport(Params exportParams) {
     if (exportParams.filename) {
         outFile = std::string(exportParams.filename);
     } else {
-        outFile = std::to_string(tile.x) + "."
-                + std::to_string(tile.y) + "."
-                + std::to_string(tile.z);
+        outFile = "foo";
+        //outFile = std::to_string(tile.x) + "."
+        //        + std::to_string(tile.y) + "."
+        //        + std::to_string(tile.z);
     }
 
     std::string outputOBJ = outFile + ".obj";
@@ -595,7 +662,7 @@ int objexport(Params exportParams) {
         exportParams.splitMesh, meshes,
         exportParams.offset[0],
         exportParams.offset[1],
-        exportParams.append, tile);
+        exportParams.append);
 
     if (!saved) {
         return EXIT_FAILURE;

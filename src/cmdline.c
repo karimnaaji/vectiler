@@ -4,8 +4,8 @@
 
 int main(int argc, const char **argv) {
     // Default parameters
-    int tileX = 19294;
-    int tileY = 24642;
+    const char* tileX = "19294";
+    const char* tileY = "24642";
     int tileZ = 16;
     float offsetX = 0.f;
     float offsetY = 0.f;
@@ -15,15 +15,15 @@ int main(int argc, const char **argv) {
     int bakeAO = 0;
     int append = 0;
     const char* name = NULL;
-    const char* apiKey = NULL;
+    const char* apiKey = "vector-tiles-qVaBcRA";
 
     // Parse params
     flag_usage("[options]");
     flag_string(&name, "name", "File name");
     flag_string(&apiKey, "apikey", "Developer API key (https://mapzen.com/developers/)");
     flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
-    flag_int(&tileX, "tilex", "Tile X");
-    flag_int(&tileY, "tiley", "Tile Y");
+    flag_string(&tileX, "tilex", "Tile X");
+    flag_string(&tileY, "tiley", "Tile Y");
     flag_int(&tileZ, "tilez", "Tile Z");
     flag_float(&offsetX, "offsetx", "Tile Offset on X coordinate");
     flag_float(&offsetY, "offsety", "Tile Offset on Y coordinate");
@@ -39,7 +39,7 @@ int main(int argc, const char **argv) {
         return EXIT_FAILURE;
     }
 
-    struct Params parameters = {&name[0], &apiKey[0], {tileX, tileY, tileZ}, {offsetX, offsetY},
+    struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, sizehint, nsamples, (bool)bakeAO, (bool)append};
 
     return objexport(parameters);

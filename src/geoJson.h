@@ -6,7 +6,7 @@
 
 #include "rapidjson/document.h"
 #include "tileData.h"
-#include "util.h"
+#include "projection.h"
 
 namespace GeoJson {
     void extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile);
