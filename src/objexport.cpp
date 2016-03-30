@@ -31,12 +31,12 @@ struct PolygonMesh {
     std::vector<PolygonVertex> vertices;
 };
 
-static size_t write_data(void *_ptr, size_t _size, size_t _nmemb, void *_stream) {
-    ((std::stringstream*) _stream)->write(reinterpret_cast<char *>(_ptr), _size * _nmemb);
-    return _size * _nmemb;
+static size_t write_data(void* ptr, size_t size, size_t nmemb, void *stream) {
+    ((std::stringstream*) stream)->write(reinterpret_cast<char*>(ptr), size * nmemb);
+    return size * nmemb;
 }
 
-bool downloadData(std::stringstream& _out, const std::string& _url) {
+bool downloadData(std::stringstream& out, const std::string& url) {
     static bool curlInitialized = false;
     if (!curlInitialized) {
         curl_global_init(CURL_GLOBAL_DEFAULT);
@@ -47,30 +47,30 @@ bool downloadData(std::stringstream& _out, const std::string& _url) {
 
     // set up curl to perform fetch
     curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &_out);
-    curl_easy_setopt(curlHandle, CURLOPT_URL, _url.c_str());
+    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
+    curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
     curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
     curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
     curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
 
-    printf("Fetching URL with curl: %s\n", _url.c_str());
+    printf("Fetching URL with curl: %s\n", url.c_str());
 
     CURLcode result = curl_easy_perform(curlHandle);
 
     if (result != CURLE_OK) {
         printf("Curl download failure: %s\n", curl_easy_strerror(result));
     } else {
-        printf("Downloaded data from url: %s\n", _url.c_str());
+        printf("Downloaded data from url: %s\n", url.c_str());
     }
 
     return result == CURLE_OK;
 }
 
-std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& _url, const Tile& _tile) {
+std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url, const Tile& tile) {
     std::stringstream out;
 
-    if (downloadData(out, _url)) {
+    if (downloadData(out, url)) {
         unsigned char* pixels;
         int width, height, comp;
 
@@ -114,11 +114,11 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& _url, const
     return nullptr;
 }
 
-std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _tile) {
+std::unique_ptr<TileData> downloadTile(const std::string& url, const Tile& tile) {
     std::stringstream out;
 
-    if (downloadData(out, _url)) {
-        printf("Fetched tile: %s\n", _url.c_str());
+    if (downloadData(out, url)) {
+        printf("Fetched tile: %s\n", url.c_str());
 
         // parse written data into a JSON object
         rapidjson::Document doc;
@@ -132,7 +132,7 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
         std::unique_ptr<TileData> data = std::unique_ptr<TileData>(new TileData());
         for (auto layer = doc.MemberBegin(); layer != doc.MemberEnd(); ++layer) {
             data->layers.emplace_back(std::string(layer->name.GetString()));
-            GeoJson::extractLayer(layer->value, data->layers.back(), _tile);
+            GeoJson::extractLayer(layer->value, data->layers.back(), tile);
         }
 
         return std::move(data);
@@ -141,23 +141,23 @@ std::unique_ptr<TileData> downloadTile(const std::string& _url, const Tile& _til
     return nullptr;
 }
 
-void buildPlane(std::vector<PolygonVertex>& _vertices,
-    std::vector<unsigned int>& _indices,
-    float _width,       // Total plane width (x-axis)
-    float _height,      // Total plane height (y-axis)
-    unsigned int _nw,   // Split on width
-    unsigned int _nh)   // Split on height
+void buildPlane(std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    float width,       // Total plane width (x-axis)
+    float height,      // Total plane height (y-axis)
+    unsigned int nw,   // Split on width
+    unsigned int nh)   // Split on height
 {
     std::vector<glm::vec4> vertices;
     std::vector<int> indices;
 
     int indexOffset = 0;
 
-    float ow = _width / _nw;
-    float oh = _height / _nh;
+    float ow = width / nw;
+    float oh = height / nh;
 
-    for (float w = -_width / 2.0; w <= _width / 2.0 - ow; w += ow) {
-        for (float h = -_height / 2.0; h <= _height / 2.0 - oh; h += oh) {
+    for (float w = -width / 2.0; w <= width / 2.0 - ow; w += ow) {
+        for (float h = -height / 2.0; h <= height / 2.0 - oh; h += oh) {
             glm::vec3 v0(w, h + oh, 0.0);
             glm::vec3 v1(w, h, 0.0);
             glm::vec3 v2(w + ow, h, 0.0);
@@ -165,38 +165,38 @@ void buildPlane(std::vector<PolygonVertex>& _vertices,
 
             static const glm::vec3 up(0.0, 0.0, 1.0);
 
-            _vertices.push_back({v0, up});
-            _vertices.push_back({v1, up});
-            _vertices.push_back({v2, up});
-            _vertices.push_back({v3, up});
+            outVertices.push_back({v0, up});
+            outVertices.push_back({v1, up});
+            outVertices.push_back({v2, up});
+            outVertices.push_back({v3, up});
 
-            _indices.push_back(indexOffset+0);
-            _indices.push_back(indexOffset+1);
-            _indices.push_back(indexOffset+2);
-            _indices.push_back(indexOffset+0);
-            _indices.push_back(indexOffset+2);
-            _indices.push_back(indexOffset+3);
+            outIndices.push_back(indexOffset+0);
+            outIndices.push_back(indexOffset+1);
+            outIndices.push_back(indexOffset+2);
+            outIndices.push_back(indexOffset+0);
+            outIndices.push_back(indexOffset+2);
+            outIndices.push_back(indexOffset+3);
 
             indexOffset += 4;
         }
     }
 }
 
-void buildPolygonExtrusion(const Polygon& _polygon,
+void buildPolygonExtrusion(const Polygon& polygon,
     double _minHeight,
-    double _height,
-    std::vector<PolygonVertex>& _vertices,
-    std::vector<unsigned int>& _indices)
+    double height,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices)
 {
-    int vertexDataOffset = _vertices.size();
+    int vertexDataOffset = outVertices.size();
     glm::vec3 upVector(0.0f, 0.0f, 1.0f);
     glm::vec3 normalVector;
 
-    for (auto& line : _polygon) {
+    for (auto& line : polygon) {
         size_t lineSize = line.size();
 
-        _vertices.reserve(_vertices.size() + lineSize * 4);
-        _indices.reserve(_indices.size() + lineSize * 6);
+        outVertices.reserve(outVertices.size() + lineSize * 4);
+        outIndices.reserve(outIndices.size() + lineSize * 6);
 
         for (size_t i = 0; i < lineSize - 1; i++) {
             glm::vec3 a(line[i]);
@@ -207,71 +207,71 @@ void buildPolygonExtrusion(const Polygon& _polygon,
             normalVector = glm::cross(upVector, b - a);
             normalVector = glm::normalize(normalVector);
 
-            a.z = _height;
-            _vertices.push_back({a, normalVector});
-            b.z = _height;
-            _vertices.push_back({b, normalVector});
+            a.z = height;
+            outVertices.push_back({a, normalVector});
+            b.z = height;
+            outVertices.push_back({b, normalVector});
             a.z = _minHeight;
-            _vertices.push_back({a, normalVector});
+            outVertices.push_back({a, normalVector});
             b.z = _minHeight;
-            _vertices.push_back({b, normalVector});
+            outVertices.push_back({b, normalVector});
 
-            _indices.push_back(vertexDataOffset+0);
-            _indices.push_back(vertexDataOffset+1);
-            _indices.push_back(vertexDataOffset+2);
-            _indices.push_back(vertexDataOffset+1);
-            _indices.push_back(vertexDataOffset+3);
-            _indices.push_back(vertexDataOffset+2);
+            outIndices.push_back(vertexDataOffset+0);
+            outIndices.push_back(vertexDataOffset+1);
+            outIndices.push_back(vertexDataOffset+2);
+            outIndices.push_back(vertexDataOffset+1);
+            outIndices.push_back(vertexDataOffset+3);
+            outIndices.push_back(vertexDataOffset+2);
 
             vertexDataOffset += 4;
         }
     }
 }
 
-void buildPolygon(const Polygon& _polygon,
-    double _height,
-    std::vector<PolygonVertex>& _vertices,
-    std::vector<unsigned int>& _indices)
+void buildPolygon(const Polygon& polygon,
+    double height,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices)
 {
     mapbox::Earcut<float, unsigned int> earcut;
 
-    earcut(_polygon);
+    earcut(polygon);
 
-    unsigned int vertexDataOffset = _vertices.size();
+    unsigned int vertexDataOffset = outVertices.size();
 
     if (earcut.indices.size() == 0) return;
 
     if (vertexDataOffset == 0) {
-        _indices = std::move(earcut.indices);
+        outIndices = std::move(earcut.indices);
     } else {
-        _indices.reserve(_indices.size() + earcut.indices.size());
+        outIndices.reserve(outIndices.size() + earcut.indices.size());
         for (auto i : earcut.indices) {
-            _indices.push_back(vertexDataOffset + i);
+            outIndices.push_back(vertexDataOffset + i);
         }
     }
 
     static glm::vec3 normal(0.0, 0.0, 1.0);
 
-    _vertices.reserve(_vertices.size() + earcut.vertices.size());
+    outVertices.reserve(outVertices.size() + earcut.vertices.size());
 
     for (auto& p : earcut.vertices) {
-        glm::vec3 coord(p[0], p[1], _height);
-        _vertices.push_back({coord, normal});
+        glm::vec3 coord(p[0], p[1], height);
+        outVertices.push_back({coord, normal});
     }
 }
 
-bool saveOBJ(std::string _outputOBJ,
-    bool _splitMeshes,
-    std::vector<PolygonMesh>& _meshes,
-    float _offsetX,
-    float _offsetY,
-    bool _append,
-    Tile _tile)
+bool saveOBJ(std::string outputOBJ,
+    bool splitMeshes,
+    std::vector<PolygonMesh>& meshes,
+    float offsetx,
+    float offsety,
+    bool append,
+    Tile tile)
 {
 
     /// Cleanup mesh from degenerate points
     {
-        for (auto& mesh : _meshes) {
+        for (auto& mesh : meshes) {
             if (mesh.indices.size() == 0) continue;
 
             int i = 0;
@@ -297,10 +297,10 @@ bool saveOBJ(std::string _outputOBJ,
 
     /// Find max index from previously existing wavefront vertices
     {
-        std::ifstream filein(_outputOBJ.c_str(), std::ios::in);
+        std::ifstream filein(outputOBJ.c_str(), std::ios::in);
         std::string token;
 
-        if (filein.good() && _append) {
+        if (filein.good() && append) {
             // TODO: optimize this
             while (!filein.eof()) {
                 filein >> token;
@@ -334,10 +334,10 @@ bool saveOBJ(std::string _outputOBJ,
     /// Save obj file
     {
         std::ofstream file;
-        if (_append) {
-            file = std::ofstream(_outputOBJ, std::ios_base::app);
+        if (append) {
+            file = std::ofstream(outputOBJ, std::ios_base::app);
         } else {
-            file = std::ofstream(_outputOBJ);
+            file = std::ofstream(outputOBJ);
         }
 
         if (file.is_open()) {
@@ -346,17 +346,17 @@ bool saveOBJ(std::string _outputOBJ,
 
             int indexOffset = maxindex;
 
-            if (_splitMeshes) {
+            if (splitMeshes) {
                 int meshCnt = 0;
 
-                for (const PolygonMesh& mesh : _meshes) {
+                for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
-                    file << "# tile " << _tile.x << " " << _tile.y << " " << _tile.z << "\n";
+                    file << "# tile " << tile.x << " " << tile.y << " " << tile.z << "\n";
 
                     file << "o mesh" << meshCnt++ << "\n";
                     for (auto vertex : mesh.vertices) {
-                        file << "v " << vertex.position.x + _offsetX << " "
-                             << vertex.position.y + _offsetY << " "
+                        file << "v " << vertex.position.x + offsetx << " "
+                             << vertex.position.y + offsety << " "
                              << vertex.position.z << "\n";
                     }
                     for (auto vertex : mesh.vertices) {
@@ -378,18 +378,18 @@ bool saveOBJ(std::string _outputOBJ,
                     indexOffset += mesh.vertices.size();
                 }
             } else {
-                file << "o tile_" << _tile.x << "_" << _tile.y << "_" << _tile.z << "\n";
+                file << "o tile_" << tile.x << "_" << tile.y << "_" << tile.z << "\n";
 
-                for (const PolygonMesh& mesh : _meshes) {
+                for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
 
                     for (auto vertex : mesh.vertices) {
-                        file << "v " << vertex.position.x + _offsetX << " "
-                             << vertex.position.y + _offsetY << " "
+                        file << "v " << vertex.position.x + offsetx << " "
+                             << vertex.position.y + offsety << " "
                              << vertex.position.z << "\n";
                     }
                 }
-                for (const PolygonMesh& mesh : _meshes) {
+                for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
 
                     for (auto vertex : mesh.vertices) {
@@ -398,7 +398,7 @@ bool saveOBJ(std::string _outputOBJ,
                              << vertex.normal.z << "\n";
                     }
                 }
-                for (const PolygonMesh& mesh : _meshes) {
+                for (const PolygonMesh& mesh : meshes) {
                     if (mesh.vertices.size() == 0) { continue; }
 
                     for (int i = 0; i < mesh.indices.size(); i += 3) {
@@ -416,10 +416,10 @@ bool saveOBJ(std::string _outputOBJ,
             }
 
             file.close();
-            printf("Save %s\n", _outputOBJ.c_str());
+            printf("Save %s\n", outputOBJ.c_str());
             return true;
         } else {
-            printf("Can't open file %s", _outputOBJ.c_str());
+            printf("Can't open file %s", outputOBJ.c_str());
         }
     }
     return false;
