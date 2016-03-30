@@ -206,7 +206,7 @@ void buildPolygonExtrusion(const Polygon& polygon,
 
             a.x += offset.x;
             a.y += offset.y;
-            b.x += offset.y;
+            b.x += offset.x;
             b.y += offset.y;
 
             if (a == b) { continue; }
