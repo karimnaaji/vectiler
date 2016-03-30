@@ -22,11 +22,11 @@ int main(int argc, const char **argv) {
     flag_string(&name, "name", "File name");
     flag_string(&apiKey, "apikey", "Developer API key (https://mapzen.com/developers/)");
     flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
-    flag_string(&tileX, "tilex", "Tile X");
-    flag_string(&tileY, "tiley", "Tile Y");
-    flag_int(&tileZ, "tilez", "Tile Z");
-    flag_float(&offsetX, "offsetx", "Tile Offset on X coordinate");
-    flag_float(&offsetY, "offsety", "Tile Offset on Y coordinate");
+    flag_string(&tileX, "tilex", "Tile X (can be a tile range: 19294/19295)");
+    flag_string(&tileY, "tiley", "Tile Y (can be a tile range: 24642/24643)");
+    flag_int(&tileZ, "tilez", "Tile Z (zoom)");
+    flag_float(&offsetX, "offsetx", "Global tile Offset on X coordinate");
+    flag_float(&offsetY, "offsety", "Global tile Offset on Y coordinate");
     flag_int(&bakeAO, "bakeAO", "Generate ambiant occlusion baked atlas");
     flag_int(&append, "append", "Append the obj to an existing obj file");
     flag_int(&sizehint, "sizehint", "Controls resolution of atlas");

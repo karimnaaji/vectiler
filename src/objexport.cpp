@@ -275,7 +275,6 @@ bool saveOBJ(std::string outputOBJ,
     float offsety,
     bool append)
 {
-
     /// Cleanup mesh from degenerate points
     {
         for (auto& mesh : meshes) {
@@ -650,10 +649,9 @@ int objexport(Params exportParams) {
     if (exportParams.filename) {
         outFile = std::string(exportParams.filename);
     } else {
-        outFile = "foo";
-        //outFile = std::to_string(tile.x) + "."
-        //        + std::to_string(tile.y) + "."
-        //        + std::to_string(tile.z);
+        outFile = std::to_string(origin.x) + "."
+                + std::to_string(origin.y) + "."
+                + std::to_string(origin.z);
     }
 
     std::string outputOBJ = outFile + ".obj";
