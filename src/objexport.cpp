@@ -425,31 +425,25 @@ bool saveOBJ(std::string _outputOBJ,
     return false;
 }
 
-int objexport(const char* _filename,
-    const char* _apiKey,
-    int _tileX,
-    int _tileY,
-    int _tileZ,
-    float _offsetX,
-    float _offsetY,
-    bool _splitMeshes,
-    int _sizehint,
-    int _nsamples,
-    bool _bakeAO,
-    bool _append)
-{
+int objexport(Params exportParams) {
     std::string apiKey;
 
-    if (!_apiKey) {
+    if (!exportParams.apiKey) {
         apiKey = "vector-tiles-qVaBcRA";
     } else {
-        apiKey = std::string(_apiKey);
+        apiKey = std::string(exportParams.apiKey);
     }
 
-    bool terrain = true;
-    //Tile tile = {_tileX, _tileY, _tileZ};
-    Tile tile = {664, 1583, 12};
+    Tile tile = {exportParams.tile[0], exportParams.tile[1], exportParams.tile[2]};
     std::string url;
+
+    url = "http://vector.mapzen.com/osm/all/"
+        + std::to_string(tile.z) + "/"
+        + std::to_string(tile.x) + "/"
+        + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+#if 0
+    bool terrain = true;
+    Tile tile = {664, 1583, 12};
 
     if (!terrain) {
         url = "http://vector.mapzen.com/osm/all/"
@@ -537,6 +531,7 @@ int objexport(const char* _filename,
     saveOBJ("meshtest.obj", false, mes, 0, 0, false, tile);
 
     return 0;
+#endif
 
     auto data = downloadTile(url, tile);
 
@@ -556,12 +551,15 @@ int objexport(const char* _filename,
             auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
             double height = 0.0;
             double minHeight = 0.0;
+
             if (itHeight != feature.props.numericProps.end()) {
                 height = itHeight->second * tile.invScale;
             }
+
             if (itMinHeight != feature.props.numericProps.end()) {
                 minHeight = itMinHeight->second * tile.invScale;
             }
+
             PolygonMesh mesh;
             for (auto polygon : feature.polygons) {
                 if (minHeight != height) {
@@ -570,27 +568,50 @@ int objexport(const char* _filename,
                 }
                 buildPolygon(polygon, height, mesh.vertices, mesh.indices);
             }
+
             meshes.push_back(mesh);
         }
     }
 
+    // Early exit
+    if (meshes.size() == 0) {
+        printf("No output mesh for tile %d %d %d", tile.x, tile.y, tile.z);
+        return EXIT_SUCCESS;
+    }
+
     std::string outFile;
 
-    if (_filename) {
-        outFile = std::string(_filename);
+    if (exportParams.filename) {
+        outFile = std::string(exportParams.filename);
     } else {
-        outFile = std::to_string(_tileX) + "." + std::to_string(_tileY) + "." + std::to_string(_tileZ);
+        outFile = std::to_string(tile.x) + "."
+                + std::to_string(tile.y) + "."
+                + std::to_string(tile.z);
     }
 
     std::string outputOBJ = outFile + ".obj";
 
-    if (!saveOBJ(outputOBJ, _splitMeshes, meshes, _offsetX, _offsetY, _append, tile)) {
+    bool saved = saveOBJ(outputOBJ,
+        exportParams.splitMesh, meshes,
+        exportParams.offset[0],
+        exportParams.offset[1],
+        exportParams.append, tile);
+
+    if (!saved) {
         return EXIT_FAILURE;
     }
 
-    if (_bakeAO) {
-        return aobaker_bake(outputOBJ.c_str(), (outFile + "-ao.obj").c_str(),
-                (outFile + ".png").c_str(), _sizehint, _nsamples, false, false, 1.0);
+    if (exportParams.bakeAO) {
+        bool aoBaked = aobaker_bake(outputOBJ.c_str(),
+            (outFile + "-ao.obj").c_str(),
+            (outFile + ".png").c_str(),
+            exportParams.aoSizeHint,
+            exportParams.aoSamples,
+            false,  // g-buffers
+            false,  // charinfo
+            1.0);   // multiply
+
+        return aoBaked;
     }
 
     return EXIT_SUCCESS;

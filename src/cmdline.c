@@ -3,6 +3,7 @@
 #include "objexport.h"
 
 int main(int argc, const char **argv) {
+    // Default parameters
     int tileX = 19294;
     int tileY = 24642;
     int tileZ = 16;
@@ -16,6 +17,7 @@ int main(int argc, const char **argv) {
     const char* name = NULL;
     const char* apiKey = NULL;
 
+    // Parse params
     flag_usage("[options]");
     flag_string(&name, "name", "File name");
     flag_string(&apiKey, "apikey", "Developer API key (https://mapzen.com/developers/)");
@@ -37,16 +39,8 @@ int main(int argc, const char **argv) {
         return EXIT_FAILURE;
     }
 
-    return objexport(&name[0],
-            &apiKey[0],
-            tileX,
-            tileY,
-            tileZ,
-            offsetX,
-            offsetY,
-            (bool)splitMeshes,
-            sizehint,
-            nsamples,
-            (bool)bakeAO,
-            (bool)append);
+    struct Params parameters = {&name[0], &apiKey[0], {tileX, tileY, tileZ}, {offsetX, offsetY},
+        (bool)splitMeshes, sizehint, nsamples, (bool)bakeAO, (bool)append};
+
+    return objexport(parameters);
 }
