@@ -12,6 +12,9 @@ struct Params {
     int aoSamples;
     bool bakeAO;
     bool append;
+    bool terrain;
+    int terrainSubdivision;
+    float terrainExtrusionScale;
 };
 
 #ifdef __cplusplus

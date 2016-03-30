@@ -29,6 +29,7 @@ struct HeightData {
 struct PolygonMesh {
     std::vector<unsigned int> indices;
     std::vector<PolygonVertex> vertices;
+    glm::vec2 offset;
 };
 
 static size_t write_data(void* ptr, size_t size, size_t nmemb, void *stream) {
@@ -67,15 +68,20 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     return result == CURLE_OK;
 }
 
-std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url, const Tile& tile) {
+std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
+    const Tile& tile,
+    float extrusionScale)
+{
     std::stringstream out;
 
     if (downloadData(out, url)) {
         unsigned char* pixels;
         int width, height, comp;
 
-        pixels = stbi_load_from_memory(reinterpret_cast<const unsigned char*>(out.str().c_str()),
-            out.str().length(), &width, &height, &comp, STBI_rgb_alpha);
+        // Decode texture PNG
+        const unsigned char* pngData = reinterpret_cast<const unsigned char*>(out.str().c_str());
+        pixels = stbi_load_from_memory(pngData, out.str().length(), &width, &height, &comp,
+            STBI_rgb_alpha);
 
         printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
 
@@ -100,12 +106,12 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url, const 
             // Decode the elevation packed data from color component
             float elevation = (red * 256 + green + blue / 256) - 32768;
 
-            int x = i / height;
-            int y = i % width;
+            int y = i / height;
+            int x = i % width;
 
-            assert(x >= 0 && x <= height && y >= 0 && y <= width);
+            assert(x >= 0 && x <= width && y >= 0 && y <= height);
 
-            data->elevation[x][y] = elevation;
+            data->elevation[x][y] = elevation * extrusionScale;
         }
 
         return std::move(data);
@@ -139,6 +145,61 @@ std::unique_ptr<TileData> downloadTile(const std::string& url, const Tile& tile)
     }
 
     return nullptr;
+}
+
+bool withinTileRange(const glm::vec2& pos) {
+    return pos.x >= -1.0 && pos.x <= 1.0
+        && pos.y >= -1.0 && pos.y <= 1.0;
+}
+
+/*
+ * Sample elevation using bilinear texture sampling
+ * - position: must lie within tile range [-1.0, 1.0]
+ * - textureData: the elevation tile data, may be null
+ */
+float sampleElevation(glm::vec2 position, const std::unique_ptr<HeightData>& textureData) {
+    if (!textureData) {
+        return 0.0;
+    }
+
+    if (!withinTileRange(position)) {
+        position = glm::clamp(position, glm::vec2(-1.0), glm::vec2(1.0));
+    }
+
+    // Normalize vertex coordinates into the texture coordinates range
+    float u = (position.x * 0.5f + 0.5f) * textureData->width;
+    float v = (position.y * 0.5f + 0.5f) * textureData->height;
+
+    // Flip v coordinate according to tile coordinates
+    v = textureData->height - v;
+
+    float alpha = u - floor(u);
+    float beta  = v - floor(v);
+
+    int ii0 = floor(u);
+    int jj0 = floor(v);
+    int ii1 = ii0 + 1;
+    int jj1 = jj0 + 1;
+
+    // Clamp on borders
+    ii0 = std::min(ii0, textureData->width - 1);
+    jj0 = std::min(jj0, textureData->height -1);
+    ii1 = std::min(ii1, textureData->width - 1);
+    jj1 = std::min(jj1, textureData->height - 1);
+
+    // Sample four corners of the current texel
+    float s0 = textureData->elevation[ii0][jj0];
+    float s1 = textureData->elevation[ii0][jj1];
+    float s2 = textureData->elevation[ii1][jj0];
+    float s3 = textureData->elevation[ii1][jj1];
+
+    // Sample the bilinear height from the elevation texture
+    float bilinearHeight = (1 - beta) * (1 - alpha) * s0
+                         + (1 - beta) * alpha       * s1
+                         + beta       * (1 - alpha) * s2
+                         + alpha      * beta        * s3;
+
+    return bilinearHeight;
 }
 
 void buildPlane(std::vector<PolygonVertex>& outVertices,
@@ -184,11 +245,12 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
 }
 
 void buildPolygonExtrusion(const Polygon& polygon,
-    double _minHeight,
+    double minHeight,
     double height,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
-    glm::vec2 offset)
+    const std::unique_ptr<HeightData>& elevation,
+    float inverseTileScale)
 {
     int vertexDataOffset = outVertices.size();
     glm::vec3 upVector(0.0f, 0.0f, 1.0f);
@@ -204,23 +266,24 @@ void buildPolygonExtrusion(const Polygon& polygon,
             glm::vec3 a(line[i]);
             glm::vec3 b(line[i+1]);
 
-            a.x += offset.x;
-            a.y += offset.y;
-            b.x += offset.x;
-            b.y += offset.y;
-
             if (a == b) { continue; }
 
             normalVector = glm::cross(upVector, b - a);
             normalVector = glm::normalize(normalVector);
 
-            a.z = height;
+            float az = sampleElevation(glm::vec2(a.x, a.y), elevation);
+            float bz = sampleElevation(glm::vec2(b.x, b.y), elevation);
+
+            az *= inverseTileScale;
+            bz *= inverseTileScale;
+
+            a.z = height + az;
             outVertices.push_back({a, normalVector});
-            b.z = height;
+            b.z = height + bz;
             outVertices.push_back({b, normalVector});
-            a.z = _minHeight;
+            a.z = minHeight + az;
             outVertices.push_back({a, normalVector});
-            b.z = _minHeight;
+            b.z = minHeight + bz;
             outVertices.push_back({b, normalVector});
 
             outIndices.push_back(vertexDataOffset+0);
@@ -239,7 +302,8 @@ void buildPolygon(const Polygon& polygon,
     double height,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
-    glm::vec2 offset)
+    const std::unique_ptr<HeightData>& elevation,
+    float inverseTileScale)
 {
     mapbox::Earcut<float, unsigned int> earcut;
 
@@ -247,12 +311,15 @@ void buildPolygon(const Polygon& polygon,
 
     unsigned int vertexDataOffset = outVertices.size();
 
-    if (earcut.indices.size() == 0) return;
+    if (earcut.indices.size() == 0) {
+        return;
+    }
 
     if (vertexDataOffset == 0) {
         outIndices = std::move(earcut.indices);
     } else {
         outIndices.reserve(outIndices.size() + earcut.indices.size());
+
         for (auto i : earcut.indices) {
             outIndices.push_back(vertexDataOffset + i);
         }
@@ -263,14 +330,30 @@ void buildPolygon(const Polygon& polygon,
     outVertices.reserve(outVertices.size() + earcut.vertices.size());
 
     for (auto& p : earcut.vertices) {
-        glm::vec3 coord(p[0] + offset.x, p[1] + offset.y, height);
+        glm::vec2 position(p[0], p[1]);
+
+        // TODO: use centroid of polygon and sample elevation once
+        float pz = sampleElevation(position, elevation);
+
+        pz *= inverseTileScale;
+
+        glm::vec3 coord(position.x, position.y, height + pz);
         outVertices.push_back({coord, normal});
     }
 }
 
+/*
+ * Save an obj file for the set of meshes
+ * - outputOBJ: the output filename of the wavefront object file
+ * - splitMeshes: will enable exporting meshes as single objects within
+ *   the wavefront file
+ * - offsetx/y: are global offset, additional to the inner mesh offset
+ * - append: option will append meshes to an existing obj file
+ *   (filename should be the same)
+ */
 bool saveOBJ(std::string outputOBJ,
     bool splitMeshes,
-    std::vector<PolygonMesh>& meshes,
+    std::vector<std::unique_ptr<PolygonMesh>>& meshes,
     float offsetx,
     float offsety,
     bool append)
@@ -278,17 +361,17 @@ bool saveOBJ(std::string outputOBJ,
     /// Cleanup mesh from degenerate points
     {
         for (auto& mesh : meshes) {
-            if (mesh.indices.size() == 0) continue;
+            if (mesh->indices.size() == 0) continue;
 
             int i = 0;
-            for (auto it = mesh.indices.begin(); it < mesh.indices.end() - 2;) {
-                glm::vec3 p0 = mesh.vertices[mesh.indices[i+0]].position;
-                glm::vec3 p1 = mesh.vertices[mesh.indices[i+1]].position;
-                glm::vec3 p2 = mesh.vertices[mesh.indices[i+2]].position;
+            for (auto it = mesh->indices.begin(); it < mesh->indices.end() - 2;) {
+                glm::vec3 p0 = mesh->vertices[mesh->indices[i+0]].position;
+                glm::vec3 p1 = mesh->vertices[mesh->indices[i+1]].position;
+                glm::vec3 p2 = mesh->vertices[mesh->indices[i+2]].position;
 
                 if (p0 == p1 || p0 == p2) {
                     for (int j = 0; j < 3; ++j) {
-                        it = mesh.indices.erase(it);
+                        it = mesh->indices.erase(it);
                     }
                 } else {
                     it += 3;
@@ -355,68 +438,75 @@ bool saveOBJ(std::string outputOBJ,
             if (splitMeshes) {
                 int meshCnt = 0;
 
-                for (const PolygonMesh& mesh : meshes) {
-                    if (mesh.vertices.size() == 0) { continue; }
+                for (const auto& mesh : meshes) {
+                    if (mesh->vertices.size() == 0) { continue; }
 
                     file << "o mesh" << meshCnt++ << "\n";
-                    for (auto vertex : mesh.vertices) {
-                        file << "v " << vertex.position.x + offsetx << " "
-                             << vertex.position.y + offsety << " "
+
+                    for (auto vertex : mesh->vertices) {
+                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
+                             << vertex.position.y + offsety + mesh->offset.y << " "
                              << vertex.position.z << "\n";
                     }
-                    for (auto vertex : mesh.vertices) {
+
+                    for (auto vertex : mesh->vertices) {
                         file << "vn " << vertex.normal.x << " "
                              << vertex.normal.y << " "
                              << vertex.normal.z << "\n";
                     }
-                    for (int i = 0; i < mesh.indices.size(); i += 3) {
-                        file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
-                             << mesh.indices[i] + indexOffset + 1;
+
+                    for (int i = 0; i < mesh->indices.size(); i += 3) {
+                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
+                             << mesh->indices[i] + indexOffset + 1;
                         file << " ";
-                        file << mesh.indices[i+1] + indexOffset + 1 << "//"
-                             << mesh.indices[i+1] + indexOffset + 1;
+                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
+                             << mesh->indices[i+1] + indexOffset + 1;
                         file << " ";
-                        file << mesh.indices[i+2] + indexOffset + 1 << "//"
-                             << mesh.indices[i+2] + indexOffset + 1 << "\n";
+                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
+                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
                     }
+
                     file << "\n";
-                    indexOffset += mesh.vertices.size();
+                    indexOffset += mesh->vertices.size();
                 }
             } else {
-                //file << "o tile_" << tile.x << "_" << tile.y << "_" << tile.z << "\n";
+                file << "o " << outputOBJ << "\n";
 
-                for (const PolygonMesh& mesh : meshes) {
-                    if (mesh.vertices.size() == 0) { continue; }
+                for (const auto& mesh : meshes) {
+                    if (mesh->vertices.size() == 0) { continue; }
 
-                    for (auto vertex : mesh.vertices) {
-                        file << "v " << vertex.position.x + offsetx << " "
-                             << vertex.position.y + offsety << " "
+                    for (auto vertex : mesh->vertices) {
+                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
+                             << vertex.position.y + offsety + mesh->offset.y << " "
                              << vertex.position.z << "\n";
                     }
                 }
-                for (const PolygonMesh& mesh : meshes) {
-                    if (mesh.vertices.size() == 0) { continue; }
 
-                    for (auto vertex : mesh.vertices) {
+                for (const auto& mesh : meshes) {
+                    if (mesh->vertices.size() == 0) { continue; }
+
+                    for (auto vertex : mesh->vertices) {
                         file << "vn " << vertex.normal.x << " "
                              << vertex.normal.y << " "
                              << vertex.normal.z << "\n";
                     }
                 }
-                for (const PolygonMesh& mesh : meshes) {
-                    if (mesh.vertices.size() == 0) { continue; }
 
-                    for (int i = 0; i < mesh.indices.size(); i += 3) {
-                        file << "f " << mesh.indices[i] + indexOffset + 1 << "//"
-                             << mesh.indices[i] + indexOffset + 1;
+                for (const auto& mesh : meshes) {
+                    if (mesh->vertices.size() == 0) { continue; }
+
+                    for (int i = 0; i < mesh->indices.size(); i += 3) {
+                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
+                             << mesh->indices[i] + indexOffset + 1;
                         file << " ";
-                        file << mesh.indices[i+1] + indexOffset + 1 << "//"
-                             << mesh.indices[i+1] + indexOffset + 1;
+                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
+                             << mesh->indices[i+1] + indexOffset + 1;
                         file << " ";
-                        file << mesh.indices[i+2] + indexOffset + 1 << "//"
-                             << mesh.indices[i+2] + indexOffset + 1 << "\n";
+                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
+                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
                     }
-                    indexOffset += mesh.vertices.size();
+
+                    indexOffset += mesh->vertices.size();
                 }
             }
 
@@ -427,7 +517,28 @@ bool saveOBJ(std::string outputOBJ,
             printf("Can't open file %s", outputOBJ.c_str());
         }
     }
+
     return false;
+}
+
+glm::vec2 centroid(const std::vector<std::vector<glm::vec3>>& _polygon) {
+    glm::vec2 centroid;
+    int n = 0;
+
+    for (auto& l : _polygon) {
+        for (auto& p : l) {
+            centroid.x += p.x;
+            centroid.y += p.y;
+            n++;
+        }
+    }
+
+    if (n == 0) {
+        return centroid;
+    }
+
+    centroid /= n;
+    return centroid;
 }
 
 std::vector<std::string> splitString(const std::string& s, char delim) {
@@ -463,6 +574,20 @@ bool extractTileRange(int* start, int* end, const std::string& range) {
     return true;
 }
 
+inline std::string vectorURL(const Tile& tile, const std::string& apiKey) {
+    return "http://vector.mapzen.com/osm/all/"
+        + std::to_string(tile.z) + "/"
+        + std::to_string(tile.x) + "/"
+        + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+}
+
+inline std::string terrainURL(const Tile& tile) {
+    return "https://terrain-preview.mapzen.com/terrarium/"
+        + std::to_string(tile.z) + "/"
+        + std::to_string(tile.x) + "/"
+        + std::to_string(tile.y) + ".png";
+}
+
 int objexport(Params exportParams) {
     std::string apiKey(exportParams.apiKey);
 
@@ -496,150 +621,140 @@ int objexport(Params exportParams) {
         return EXIT_FAILURE;
     }
 
-#if 0
-    bool terrain = true;
-    Tile tile = {664, 1583, 12};
-
-    if (!terrain) {
-        url = "http://vector.mapzen.com/osm/all/"
-            + std::to_string(tile.z) + "/"
-            + std::to_string(tile.x) + "/"
-            + std::to_string(tile.y) + ".json?api_key=" + apiKey;
-    } else {
-        url = "https://terrain-preview.mapzen.com/terrarium/"
-            + std::to_string(tile.z) + "/"
-            + std::to_string(tile.x) + "/"
-            + std::to_string(tile.y) + ".png";
-    }
-
-    std::unique_ptr<HeightData> textureData = downloadHeightmapTile(url, tile);
-
-    assert(textureData != nullptr);
-
-    PolygonMesh m;
-
-    /// Build terrain mesh
-    {
-        // Extract a plane geometry, vertices in [-1.0,1.0]
-        // With a resolution of 512 * 512 vertices
-        buildPlane(m.vertices, m.indices, 2.0, 2.0, 512, 512);
-
-        // Build terrain mesh extrusion, with bilinear height sampling
-        for (auto& vertex : m.vertices) {
-            // Normalize vertex coordinates into the texture coordinates range
-            float u = (vertex.position.x * 0.5f + 0.5f) * textureData->width;
-            float v = (vertex.position.y * 0.5f + 0.5f) * textureData->height;
-
-            float alpha = u - floor(u);
-            float beta  = v - floor(v);
-
-            int ii0 = floor(u);
-            int jj0 = floor(v);
-            int ii1 = ii0 + 1;
-            int jj1 = jj0 + 1;
-
-            // Clamp on borders
-            ii0 = std::min(ii0, textureData->width - 1);
-            jj0 = std::min(jj0, textureData->height -1);
-            ii1 = std::min(ii1, textureData->width - 1);
-            jj1 = std::min(jj1, textureData->height - 1);
-
-            // Sample four corners of the current texel
-            float s0 = textureData->elevation[ii0][jj0];
-            float s1 = textureData->elevation[ii0][jj1];
-            float s2 = textureData->elevation[ii1][jj0];
-            float s3 = textureData->elevation[ii1][jj1];
-
-            // Sample the bilinear height from the elevation texture
-            float bilinearHeight = (1 - beta) * (1 - alpha) * s0
-                                 + (1 - beta) * alpha       * s1
-                                 + beta       * (1 - alpha) * s2
-                                 + alpha      * beta        * s3;
-
-            // Scale the height within the tile scale
-            vertex.position.z = bilinearHeight * tile.invScale;
-        }
-
-        // Compute faces normals
-        for (size_t i = 0; i < m.indices.size(); i += 3) {
-            int i1 = m.indices[i+0];
-            int i2 = m.indices[i+1];
-            int i3 = m.indices[i+2];
-
-            const glm::vec3& v1 = m.vertices[i1].position;
-            const glm::vec3& v2 = m.vertices[i2].position;
-            const glm::vec3& v3 = m.vertices[i3].position;
-
-            glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
-
-            m.vertices[i1].normal += d;
-            m.vertices[i2].normal += d;
-            m.vertices[i3].normal += d;
-        }
-
-        for (auto& v : m.vertices) {
-            v.normal = glm::normalize(v.normal);
-        }
-    }
-
-    std::vector<PolygonMesh> mes = {m};
-    saveOBJ("meshtest.obj", false, mes, 0, 0, false, tile);
-
-    return 0;
-#endif
-
-    std::vector<PolygonMesh> meshes;
-
     glm::vec2 offset;
     Tile origin = tiles[0];
 
+    std::vector<std::unique_ptr<PolygonMesh>> meshes;
+
+    // Build meshes for each of the tiles
     for (auto tile : tiles) {
         std::string url;
 
         offset.x =  (tile.x - origin.x) * 2;
         offset.y = -(tile.y - origin.y) * 2;
 
-        url = "http://vector.mapzen.com/osm/all/"
-            + std::to_string(tile.z) + "/"
-            + std::to_string(tile.x) + "/"
-            + std::to_string(tile.y) + ".json?api_key=" + apiKey;
+        std::unique_ptr<HeightData> textureData = nullptr;
 
-        auto data = downloadTile(url, tile);
+        /// Build terrain mesh
+        if (exportParams.terrain) {
+            url = terrainURL(tile);
 
-        if (!data) {
-            printf("Failed to download tile data\n");
-            return EXIT_FAILURE;
+            textureData = downloadHeightmapTile(url, tile, exportParams.terrainExtrusionScale);
+
+            if (!textureData) {
+                printf("Failed to download heightmap texture data for tile %d %d %d\n",
+                    tile.x, tile.y, tile.z);
+            } else {
+                auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+
+                /// Extract a plane geometry, vertices in [-1.0,1.0]
+                {
+                    buildPlane(mesh->vertices, mesh->indices, 2.0, 2.0,
+                        exportParams.terrainSubdivision, exportParams.terrainSubdivision);
+
+                    // Build terrain mesh extrusion, with bilinear height sampling
+                    for (auto& vertex : mesh->vertices) {
+                        glm::vec2 tilePosition = glm::vec2(vertex.position.x, vertex.position.y);
+                        float extrusion = sampleElevation(tilePosition, textureData);
+
+                        // Scale the height within the tile scale
+                        vertex.position.z = extrusion * tile.invScale;
+                    }
+                }
+
+                /// Compute faces normals
+                {
+                    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
+                        int i1 = mesh->indices[i+0];
+                        int i2 = mesh->indices[i+1];
+                        int i3 = mesh->indices[i+2];
+
+                        const glm::vec3& v1 = mesh->vertices[i1].position;
+                        const glm::vec3& v2 = mesh->vertices[i2].position;
+                        const glm::vec3& v3 = mesh->vertices[i3].position;
+
+                        glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+
+                        mesh->vertices[i1].normal += d;
+                        mesh->vertices[i2].normal += d;
+                        mesh->vertices[i3].normal += d;
+                    }
+
+                    for (auto& v : mesh->vertices) {
+                        v.normal = glm::normalize(v.normal);
+                    }
+                }
+
+                mesh->offset = offset;
+                meshes.push_back(std::move(mesh));
+            }
         }
 
-        const static std::string keyHeight("height");
-        const static std::string keyMinHeight("min_height");
+        /// Build vector tile mesh
+        {
+            url = vectorURL(tile, apiKey);
 
-        for (auto layer : data->layers) {
-            // TODO: give layer as parameter, to filter
-            for (auto feature : layer.features) {
-                auto itHeight = feature.props.numericProps.find(keyHeight);
-                auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
-                double height = 0.0;
-                double minHeight = 0.0;
+            auto data = downloadTile(url, tile);
 
-                if (itHeight != feature.props.numericProps.end()) {
-                    height = itHeight->second * tile.invScale;
-                }
+            if (!data) {
+                printf("Failed to download tile data\n");
+                return EXIT_FAILURE;
+            }
 
-                if (itMinHeight != feature.props.numericProps.end()) {
-                    minHeight = itMinHeight->second * tile.invScale;
-                }
+            const static std::string keyHeight("height");
+            const static std::string keyMinHeight("min_height");
 
-                PolygonMesh mesh;
-                for (auto polygon : feature.polygons) {
-                    if (minHeight != height) {
-                        buildPolygonExtrusion(polygon, minHeight, height,
-                            mesh.vertices, mesh.indices, offset);
+            for (auto layer : data->layers) {
+                // TODO: give layer as parameter, to filter
+                for (auto feature : layer.features) {
+                    // Coupled with terrain data, only export layer buildings for now
+                    if (textureData && layer.name != "buildings") {
+                        continue;
                     }
-                    buildPolygon(polygon, height, mesh.vertices, mesh.indices, offset);
-                }
 
-                meshes.push_back(mesh);
+                    auto itHeight = feature.props.numericProps.find(keyHeight);
+                    auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
+                    double height = 0.0;
+                    double minHeight = 0.0;
+
+                    if (itHeight != feature.props.numericProps.end()) {
+                        height = itHeight->second * tile.invScale;
+                    }
+
+                    if (textureData && height == 0.0) {
+                        continue;
+                    }
+
+                    if (itMinHeight != feature.props.numericProps.end()) {
+                        minHeight = itMinHeight->second * tile.invScale;
+                    }
+
+#if 0
+                    // TODO: add as param
+                    if (layer.name == "landuse") {
+                        height = 0.02;
+                    }
+
+                    if (layer.name == "water") {
+                        height = 0.01;
+                    }
+#endif
+
+                    auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+                    for (auto polygon : feature.polygons) {
+                        if (minHeight != height) {
+                            buildPolygonExtrusion(polygon, minHeight, height,
+                                mesh->vertices, mesh->indices, textureData, tile.invScale);
+                        }
+
+                        buildPolygon(polygon, height, mesh->vertices, mesh->indices,
+                            textureData, tile.invScale);
+                    }
+
+                    // Add local mesh offset
+                    mesh->offset = offset;
+                    meshes.push_back(std::move(mesh));
+                }
             }
         }
     }
@@ -656,6 +771,7 @@ int objexport(Params exportParams) {
 
     std::string outputOBJ = outFile + ".obj";
 
+    // Save output OBJ file
     bool saved = saveOBJ(outputOBJ,
         exportParams.splitMesh, meshes,
         exportParams.offset[0],
@@ -666,6 +782,7 @@ int objexport(Params exportParams) {
         return EXIT_FAILURE;
     }
 
+    // Bake ambiant occlusion using AO Baker
     if (exportParams.bakeAO) {
         bool aoBaked = aobaker_bake(outputOBJ.c_str(),
             (outFile + "-ao.obj").c_str(),
