@@ -71,21 +71,7 @@ Output files are:
 
 Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
 ```sh
-#!/bin/bash
-
-offsetx=0
-for x in {19293..19298}
-do
-    offsetx=$((offsetx+2))
-    offsety=0
-    for y in {24639..24643}
-    do
-        offsety=$((offsety-2))
-        # --append option will append results to manhattan.obj
-        # --offsetx and --offsety will offset the vertices of appended objs
-        ./objexport --name manhattan --tilex $x --tiley $y --tilez 16 --offsetx $offsetx --offsety $offsety --append 1
-    done
-done
+./objexport --name manhattan --tilex 19293/19298 --tiley 24639/24643
 ```
 
 ![](img/vectiler.png)
