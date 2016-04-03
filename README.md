@@ -37,23 +37,25 @@ $ cmake --build build
   Usage: ./objexport [options]
 
   Options:
-    --name                   File name ((null))
-    --apikey                 Developer API key (https://mapzen.com/developers/) (vector-tiles-qVaBcRA)
-    --splitMeshes            Generate one mesh per feature in wavefront file (0)
-    --tilex                  Tile X (can be a tile range: 19294/19295) (19294)
-    --tiley                  Tile Y (can be a tile range: 24642/24643) (24642)
-    --tilez                  Tile Z (zoom) (16)
-    --offsetx                Global tile Offset on X coordinate (0.0)
-    --offsety                Global tile Offset on Y coordinate (0.0)
-    --append                 Append the obj to an existing obj file (0)
-    --terrain                Generate terrain elevation topography (0)
-    --terrainSubdivision     Terrain mesh subdivision (64)
-    --terrainExtrusionScale  Terrain mesh extrusion scale (1.0)
-    --bakeAO                 Generate ambiant occlusion baked atlas (0)
-    --sizehint               Controls resolution of atlas (512)
-    --nsamples               Quality of ambient occlusion (256)
-    --version                Output version
-    --help                   Output help
+    --name                     File name ((null))
+    --apikey                   Developer API key (https://mapzen.com/developers/) (vector-tiles-qVaBcRA)
+    --splitMeshes              Generate one mesh per feature in wavefront file (0)
+    --tilex                    Tile X (can be a tile range: 19294/19295) (19294)
+    --tiley                    Tile Y (can be a tile range: 24642/24643) (24642)
+    --tilez                    Tile Z (zoom) (16)
+    --offsetx                  Global tile Offset on X coordinate (0.0)
+    --offsety                  Global tile Offset on Y coordinate (0.0)
+    --append                   Append the obj to an existing obj file (0)
+    --buildings                Whether to export building geometry (1)
+    --buildingsExtrusionScale  Building height scale factor (1.0)
+    --terrain                  Generate terrain elevation topography (0)
+    --terrainSubdivision       Terrain mesh subdivision (64)
+    --terrainExtrusionScale    Terrain mesh extrusion scale (1.0)
+    --aoBaking                 Generate ambiant occlusion baked atlas (0)
+    --aoAtlasSize              Controls resolution of atlas (512)
+    --aoSamples                Number of samples for ambient occlusion (256)
+    --version                  Output version
+    --help                     Output help
 ```
 
 **example**

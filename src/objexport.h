@@ -10,11 +10,13 @@ struct Params {
     bool splitMesh;
     int aoSizeHint;
     int aoSamples;
-    bool bakeAO;
+    bool aoBaking;
     bool append;
     bool terrain;
     int terrainSubdivision;
     float terrainExtrusionScale;
+    bool buildings;
+    float buildingsExtrusionScale;
 };
 
 #ifdef __cplusplus

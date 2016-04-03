@@ -85,7 +85,10 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
 
         printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
 
-        assert(comp == STBI_rgb_alpha);
+        if (comp != STBI_rgb_alpha) {
+            printf("Failed to decompress PNG file\n");
+            return nullptr;
+        }
 
         std::unique_ptr<HeightData> data = std::unique_ptr<HeightData>(new HeightData());
 
@@ -514,7 +517,7 @@ bool saveOBJ(std::string outputOBJ,
             printf("Save %s\n", outputOBJ.c_str());
             return true;
         } else {
-            printf("Can't open file %s", outputOBJ.c_str());
+            printf("Can't open file %s\n", outputOBJ.c_str());
         }
     }
 
@@ -600,12 +603,12 @@ int objexport(Params exportParams) {
         int startx, starty, endx, endy;
 
         if (!extractTileRange(&startx, &endx, std::string(exportParams.tilex))) {
-            printf("Bad param: %s", exportParams.tilex);
+            printf("Bad param: %s\n", exportParams.tilex);
             return EXIT_FAILURE;
         }
 
         if (!extractTileRange(&starty, &endy, std::string(exportParams.tiley))) {
-            printf("Bad param: %s", exportParams.tiley);
+            printf("Bad param: %s\n", exportParams.tiley);
             return EXIT_FAILURE;
         }
 
@@ -617,7 +620,7 @@ int objexport(Params exportParams) {
     }
 
     if (tiles.size() == 0) {
-        printf("No tiles to download");
+        printf("No tiles to download\n");
         return EXIT_FAILURE;
     }
 
@@ -691,69 +694,64 @@ int objexport(Params exportParams) {
         }
 
         /// Build vector tile mesh
-        {
+        if (exportParams.buildings) {
             url = vectorURL(tile, apiKey);
 
             auto data = downloadTile(url, tile);
 
             if (!data) {
-                printf("Failed to download tile data\n");
-                return EXIT_FAILURE;
-            }
+                printf("Failed to download vector tile data for tile %d %d %d\n",
+                    tile.x, tile.y, tile.z);
+            } else {
+                const static std::string keyHeight("height");
+                const static std::string keyMinHeight("min_height");
 
-            const static std::string keyHeight("height");
-            const static std::string keyMinHeight("min_height");
-
-            for (auto layer : data->layers) {
-                // TODO: give layer as parameter, to filter
-                for (auto feature : layer.features) {
-                    // Coupled with terrain data, only export layer buildings for now
-                    if (textureData && layer.name != "buildings") {
-                        continue;
-                    }
-
-                    auto itHeight = feature.props.numericProps.find(keyHeight);
-                    auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
-                    double height = 0.0;
-                    double minHeight = 0.0;
-
-                    if (itHeight != feature.props.numericProps.end()) {
-                        height = itHeight->second * tile.invScale;
-                    }
-
-                    if (textureData && height == 0.0) {
-                        continue;
-                    }
-
-                    if (itMinHeight != feature.props.numericProps.end()) {
-                        minHeight = itMinHeight->second * tile.invScale;
-                    }
-
-#if 0
-                    // TODO: add as param
-                    if (layer.name == "landuse") {
-                        height = 0.02;
-                    }
-
-                    if (layer.name == "water") {
-                        height = 0.01;
-                    }
-#endif
-
-                    auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
-                    for (auto polygon : feature.polygons) {
-                        if (minHeight != height) {
-                            buildPolygonExtrusion(polygon, minHeight, height,
-                                mesh->vertices, mesh->indices, textureData, tile.invScale);
+                for (auto layer : data->layers) {
+                    // TODO: give layer as parameter, to filter
+                    for (auto feature : layer.features) {
+                        // Coupled with terrain data, only export layer buildings for now
+                        if (textureData && layer.name != "buildings") {
+                            continue;
                         }
 
-                        buildPolygon(polygon, height, mesh->vertices, mesh->indices,
-                            textureData, tile.invScale);
-                    }
+                        auto itHeight = feature.props.numericProps.find(keyHeight);
+                        auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
+                        float scale = tile.invScale * exportParams.buildingsExtrusionScale;
+                        double height = 0.0;
+                        double minHeight = 0.0;
 
-                    // Add local mesh offset
-                    mesh->offset = offset;
-                    meshes.push_back(std::move(mesh));
+                        if (itHeight != feature.props.numericProps.end()) {
+                            height = itHeight->second * scale;
+                        }
+
+                        if (textureData && height == 0.0) {
+                            continue;
+                        }
+
+                        if (itMinHeight != feature.props.numericProps.end()) {
+                            minHeight = itMinHeight->second * scale;
+                        }
+
+                        // Extrude landuse and water polygons
+                        if (layer.name == "landuse") {
+                            height = scale;
+                        }
+
+                        auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+                        for (auto polygon : feature.polygons) {
+                            if (minHeight != height) {
+                                buildPolygonExtrusion(polygon, minHeight, height,
+                                    mesh->vertices, mesh->indices, textureData, tile.invScale);
+                            }
+
+                            buildPolygon(polygon, height, mesh->vertices, mesh->indices,
+                                textureData, tile.invScale);
+                        }
+
+                        // Add local mesh offset
+                        mesh->offset = offset;
+                        meshes.push_back(std::move(mesh));
+                    }
                 }
             }
         }
@@ -783,7 +781,7 @@ int objexport(Params exportParams) {
     }
 
     // Bake ambiant occlusion using AO Baker
-    if (exportParams.bakeAO) {
+    if (exportParams.aoBaking) {
         bool aoBaked = aobaker_bake(outputOBJ.c_str(),
             (outFile + "-ao.obj").c_str(),
             (outFile + ".png").c_str(),

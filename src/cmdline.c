@@ -9,14 +9,16 @@ int main(int argc, const char **argv) {
     int tileZ = 16;
     float offsetX = 0.f;
     float offsetY = 0.f;
-    int sizehint = 512;
-    int nsamples = 256;
+    int aoAtlasSize = 512;
+    int aoSamples = 256;
+    int aoBaking = 0;
     int splitMeshes = 0;
-    int bakeAO = 0;
     int append = 0;
     int terrain = 0;
     int terrainSubdivision = 64;
     float terrainExtrusionScale = 1.f;
+    int buildings = 1;
+    float buildingsExtrusionScale = 1.f;
     const char* name = NULL;
     const char* apiKey = "vector-tiles-qVaBcRA";
 
@@ -31,23 +33,25 @@ int main(int argc, const char **argv) {
     flag_float(&offsetX, "offsetx", "Global tile Offset on X coordinate");
     flag_float(&offsetY, "offsety", "Global tile Offset on Y coordinate");
     flag_int(&append, "append", "Append the obj to an existing obj file");
+    flag_int(&buildings, "buildings", "Whether to export building geometry");
+    flag_float(&buildingsExtrusionScale, "buildingsExtrusionScale", "Building height scale factor");
     flag_int(&terrain, "terrain", "Generate terrain elevation topography");
     flag_int(&terrainSubdivision, "terrainSubdivision", "Terrain mesh subdivision");
     flag_float(&terrainExtrusionScale, "terrainExtrusionScale", "Terrain mesh extrusion scale");
-    flag_int(&bakeAO, "bakeAO", "Generate ambiant occlusion baked atlas");
-    flag_int(&sizehint, "sizehint", "Controls resolution of atlas");
-    flag_int(&nsamples, "nsamples", "Quality of ambient occlusion");
+    flag_int(&aoBaking, "aoBaking", "Generate ambiant occlusion baked atlas");
+    flag_int(&aoAtlasSize, "aoAtlasSize", "Controls resolution of atlas");
+    flag_int(&aoSamples, "aoSamples", "Number of samples for ambient occlusion");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    if (append && bakeAO) {
+    if (append && aoBaking) {
         printf("Can't use options --append and --bakeAO altogether");
         printf("Those option are currently exclusive");
         return EXIT_FAILURE;
     }
 
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
-        (bool)splitMeshes, sizehint, nsamples, (bool)bakeAO, (bool)append, (bool)terrain,
-        terrainSubdivision, terrainExtrusionScale};
+        (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
+        terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale};
 
     return objexport(parameters);
 }
