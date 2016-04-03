@@ -1,4 +1,4 @@
-#include "util.h"
+#include "projection.h"
 
 glm::dvec2 lonLatToMeters(const glm::dvec2 _lonLat) {
     glm::dvec2 meters;
@@ -7,10 +7,10 @@ glm::dvec2 lonLatToMeters(const glm::dvec2 _lonLat) {
     return meters;
 }
 
-glm::dvec4 tileBounds(const Tile& _tile, double _tileSize) {
+glm::dvec4 tileBounds(int x, int y, int z, double _tileSize) {
     return glm::dvec4(
-        pixelsToMeters({ _tile.x * _tileSize, _tile.y * _tileSize }, _tile.z, 1.0 / _tileSize),
-        pixelsToMeters({ (_tile.x + 1) * _tileSize, (_tile.y + 1) * _tileSize }, _tile.z, 1.0 / _tileSize)
+        pixelsToMeters({ x * _tileSize, y * _tileSize }, z, 1.0 / _tileSize),
+        pixelsToMeters({ (x + 1) * _tileSize, (y + 1) * _tileSize }, z, 1.0 / _tileSize)
     );
 }
 
@@ -22,8 +22,8 @@ glm::dvec2 pixelsToMeters(const glm::dvec2 _pix, const int _zoom, double _invTil
     return meters;
 }
 
-glm::dvec2 tileCenter(const Tile& _tile, double _tileSize) {
-    return pixelsToMeters(glm::dvec2(_tile.x * _tileSize + _tileSize * 0.5,
-                                    (_tile.y * _tileSize + _tileSize * 0.5)),
-                                     _tile.z, 1.0 / _tileSize);
+glm::dvec2 tileCenter(int x, int y, int z, double _tileSize) {
+    return pixelsToMeters(glm::dvec2(x * _tileSize + _tileSize * 0.5,
+                                    (y * _tileSize + _tileSize * 0.5)),
+                                     z, 1.0 / _tileSize);
 }

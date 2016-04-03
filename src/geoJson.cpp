@@ -2,13 +2,9 @@
 #include "glm/glm.hpp"
 
 void GeoJson::extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile) {
-    glm::dvec4 bounds = tileBounds(_tile, 256.0);
-    glm::dvec2 tileOrigin = glm::dvec2(0.5 * (bounds.x + bounds.z), -0.5 * (bounds.y + bounds.w));
-    double scale = 0.5 * glm::abs(bounds.x - bounds.z);
-    double invScale = 1.0 / scale;
     glm::vec2 pos = lonLatToMeters(glm::dvec2(_in[0].GetDouble(), _in[1].GetDouble()));
-    _out.x = (pos.x - tileOrigin.x) * invScale;
-    _out.y = (pos.y - tileOrigin.y) * invScale;
+    _out.x = (pos.x - _tile.tileOrigin.x) * _tile.invScale;
+    _out.y = (pos.y - _tile.tileOrigin.y) * _tile.invScale;
 }
 
 void GeoJson::extractLine(const rapidjson::Value& _in, Line& _out, const Tile& _tile) {
