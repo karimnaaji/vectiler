@@ -23,7 +23,7 @@ struct Params {
 extern "C" {
 #endif
 
-int objexport(struct Params parameters);
+int vectiler(struct Params parameters);
 
 #ifdef __cplusplus
 }

@@ -1,4 +1,4 @@
-#include "geoJson.h"
+#include "geojson.h"
 #include "glm/glm.hpp"
 
 void GeoJson::extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile) {

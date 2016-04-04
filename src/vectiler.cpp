@@ -9,7 +9,7 @@
 #include "rapidjson/document.h"
 #include "geojson.h"
 #include "tileData.h"
-#include "objexport.h"
+#include "vectiler.h"
 #include "aobaker.h"
 #include "earcut.h"
 
@@ -628,7 +628,7 @@ inline std::string terrainURL(const Tile& tile) {
         + std::to_string(tile.y) + ".png";
 }
 
-int objexport(Params exportParams) {
+int vectiler(Params exportParams) {
     std::string apiKey(exportParams.apiKey);
 
     printf("Using API key %s\n", exportParams.apiKey);
