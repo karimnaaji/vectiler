@@ -5,7 +5,7 @@
 #include <iostream>
 
 #include "rapidjson/document.h"
-#include "tileData.h"
+#include "tiledata.h"
 #include "projection.h"
 
 namespace GeoJson {

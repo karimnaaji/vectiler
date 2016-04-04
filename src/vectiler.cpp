@@ -8,7 +8,7 @@
 
 #include "rapidjson/document.h"
 #include "geojson.h"
-#include "tileData.h"
+#include "tiledata.h"
 #include "vectiler.h"
 #include "aobaker.h"
 #include "earcut.h"
