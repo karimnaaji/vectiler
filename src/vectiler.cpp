@@ -3,12 +3,13 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <unordered_map>
 #include <limits>
 
 #include "rapidjson/document.h"
 #include "geojson.h"
 #include "tileData.h"
-#include "objexport.h"
+#include "vectiler.h"
 #include "aobaker.h"
 #include "earcut.h"
 
@@ -55,14 +56,14 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
     curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
 
-    printf("Fetching URL with curl: %s\n", url.c_str());
+    printf("URL request: %s ", url.c_str());
 
     CURLcode result = curl_easy_perform(curlHandle);
 
     if (result != CURLE_OK) {
-        printf("Curl download failure: %s\n", curl_easy_strerror(result));
+        printf(" -- Failure: %s\n", curl_easy_strerror(result));
     } else {
-        printf("Downloaded data from url: %s\n", url.c_str());
+        printf(" -- OK\n");
     }
 
     return result == CURLE_OK;
@@ -83,7 +84,7 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
         pixels = stbi_load_from_memory(pngData, out.str().length(), &width, &height, &comp,
             STBI_rgb_alpha);
 
-        printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
+        // printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
 
         if (comp != STBI_rgb_alpha) {
             printf("Failed to decompress PNG file\n");
@@ -127,8 +128,6 @@ std::unique_ptr<TileData> downloadTile(const std::string& url, const Tile& tile)
     std::stringstream out;
 
     if (downloadData(out, url)) {
-        printf("Fetched tile: %s\n", url.c_str());
-
         // parse written data into a JSON object
         rapidjson::Document doc;
         doc.Parse(out.str().c_str());
@@ -345,6 +344,44 @@ void buildPolygon(const Polygon& polygon,
     }
 }
 
+void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
+    for (auto& tileData0 : heightData) {
+        auto& tileHeight0 = tileData0.second;
+
+        for (auto& tileData1 : heightData) {
+            if (tileData0.first == tileData1.first) {
+                continue;
+            }
+
+            auto& tileHeight1 = tileData1.second;
+
+            if (tileData0.first.x + 1 == tileData1.first.x
+             && tileData0.first.y == tileData1.first.y) {
+                for (size_t y = 0; y < tileHeight0->height; ++y) {
+                    float h0 = tileHeight0->elevation[tileHeight0->width - 1][y];
+                    float h1 = tileHeight1->elevation[0][y];
+                    float h = (h0 + h1) * 0.5f;
+                    tileHeight0->elevation[tileHeight0->width - 1][y] = h;
+                    tileHeight1->elevation[0][y] = h;
+                }
+            }
+
+            if (tileData0.first.y + 1 == tileData1.first.y
+             && tileData0.first.x == tileData1.first.x) {
+                for (size_t x = 0; x < tileHeight0->width; ++x) {
+                    float h0 = tileHeight0->elevation[x][tileHeight0->height - 1];
+                    float h1 = tileHeight1->elevation[x][0];
+                    float h = (h0 + h1) * 0.5f;
+                    tileHeight0->elevation[x][tileHeight0->height - 1] = h;
+                    tileHeight1->elevation[x][0] = h;
+                }
+            }
+
+            // TODO: Corner point
+        }
+    }
+}
+
 /*
  * Save an obj file for the set of meshes
  * - outputOBJ: the output filename of the wavefront object file
@@ -514,7 +551,7 @@ bool saveOBJ(std::string outputOBJ,
             }
 
             file.close();
-            printf("Save %s\n", outputOBJ.c_str());
+            printf("Saved obj file %s\n", outputOBJ.c_str());
             return true;
         } else {
             printf("Can't open file %s\n", outputOBJ.c_str());
@@ -577,7 +614,7 @@ bool extractTileRange(int* start, int* end, const std::string& range) {
     return true;
 }
 
-inline std::string vectorURL(const Tile& tile, const std::string& apiKey) {
+inline std::string vectorTileURL(const Tile& tile, const std::string& apiKey) {
     return "http://vector.mapzen.com/osm/all/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
@@ -591,7 +628,7 @@ inline std::string terrainURL(const Tile& tile) {
         + std::to_string(tile.y) + ".png";
 }
 
-int objexport(Params exportParams) {
+int vectiler(Params exportParams) {
     std::string apiKey(exportParams.apiKey);
 
     printf("Using API key %s\n", exportParams.apiKey);
@@ -624,10 +661,54 @@ int objexport(Params exportParams) {
         return EXIT_FAILURE;
     }
 
+    std::unordered_map<Tile, std::unique_ptr<HeightData>> heightData;
+    std::unordered_map<Tile, std::unique_ptr<TileData>> vectorTileData;
+
+    /// Download data
+    {
+        printf("---- Downloading tile data ----\n");
+
+        for (auto tile : tiles) {
+            if (exportParams.terrain) {
+                std::string url = terrainURL(tile);
+
+                auto textureData = downloadHeightmapTile(url, tile,
+                    exportParams.terrainExtrusionScale);
+
+                if (!textureData) {
+                    printf("Failed to download heightmap texture data for tile %d %d %d\n",
+                        tile.x, tile.y, tile.z);
+                }
+
+                heightData[tile] = std::move(textureData);
+            }
+
+            if (exportParams.buildings) {
+               std::string url = vectorTileURL(tile, apiKey);
+
+                auto tileData = downloadTile(url, tile);
+
+                if (!tileData) {
+                    printf("Failed to download vector tile data for tile %d %d %d\n",
+                        tile.x, tile.y, tile.z);
+                }
+
+                vectorTileData[tile] = std::move(tileData);
+            }
+        }
+    }
+
+    /// Adjust terrain edges
+    if (exportParams.terrain) {
+        adjustTerrainEdges(heightData);
+    }
+
+    std::vector<std::unique_ptr<PolygonMesh>> meshes;
+
     glm::vec2 offset;
     Tile origin = tiles[0];
 
-    std::vector<std::unique_ptr<PolygonMesh>> meshes;
+    printf("---- Building tile data ----\n");
 
     // Build meshes for each of the tiles
     for (auto tile : tiles) {
@@ -636,13 +717,13 @@ int objexport(Params exportParams) {
         offset.x =  (tile.x - origin.x) * 2;
         offset.y = -(tile.y - origin.y) * 2;
 
-        std::unique_ptr<HeightData> textureData = nullptr;
+        const auto& textureData = heightData[tile];
 
         /// Build terrain mesh
         if (exportParams.terrain) {
             url = terrainURL(tile);
 
-            textureData = downloadHeightmapTile(url, tile, exportParams.terrainExtrusionScale);
+            const auto& textureData = heightData[tile];
 
             if (!textureData) {
                 printf("Failed to download heightmap texture data for tile %d %d %d\n",
@@ -695,14 +776,9 @@ int objexport(Params exportParams) {
 
         /// Build vector tile mesh
         if (exportParams.buildings) {
-            url = vectorURL(tile, apiKey);
+            const auto& data = vectorTileData[tile];
 
-            auto data = downloadTile(url, tile);
-
-            if (!data) {
-                printf("Failed to download vector tile data for tile %d %d %d\n",
-                    tile.x, tile.y, tile.z);
-            } else {
+            if (data) {
                 const static std::string keyHeight("height");
                 const static std::string keyMinHeight("min_height");
 

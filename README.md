@@ -34,7 +34,7 @@ $ cmake --build build
 **usage**
 
 ```
-  Usage: ./objexport [options]
+  Usage: ./vectiler [options]
 
   Options:
     --name                     File name ((null))
@@ -62,7 +62,7 @@ $ cmake --build build
 
 Download one tile with ambiant occlusion baked in a texture:
 ```sh
-./objexport --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
+./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
 Output files are:
 - `[tilex].[tiley].[tilez].obj`: a simple mesh containing coordinates and normals
@@ -71,7 +71,7 @@ Output files are:
 
 Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
 ```sh
-./objexport --name manhattan --tilex 19293/19298 --tiley 24639/24643
+./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
 ```
 
 ![](img/vectiler.png)

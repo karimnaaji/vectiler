@@ -1,6 +1,6 @@
 #include "flag.h"
 #include "flag.c"
-#include "objexport.h"
+#include "vectiler.h"
 
 int main(int argc, const char **argv) {
     // Default parameters
@@ -53,5 +53,5 @@ int main(int argc, const char **argv) {
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale};
 
-    return objexport(parameters);
+    return vectiler(parameters);
 }
