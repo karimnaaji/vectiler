@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.8)
-project(objexport)
+project(vectiler)
 
 # aobaker
 add_subdirectory(${PROJECT_SOURCE_DIR}/3rdparty/aobaker/thekla)
@@ -67,5 +67,5 @@ set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/earcut.hpp/inclu
 
 include_directories(${INCLUDE_DIRS})
 
-add_executable(objexport ${CPP_SOURCES} ${C_SOURCES})
-target_link_libraries(objexport ${LIBS} aobaker thekla_atlas embree tbb)
+add_executable(vectiler ${CPP_SOURCES} ${C_SOURCES})
+target_link_libraries(vectiler ${LIBS} aobaker thekla_atlas embree tbb)
