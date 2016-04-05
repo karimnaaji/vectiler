@@ -65,7 +65,7 @@ Terrain export is an experimental feature (data is only available in California)
 ```
 ./vectiler --tilex 5242/5260 --tiley 12642/12666 --tilez 15 --terrain 1 --buildings 1 --terrainExtrusionScale 1.5 --buildingsExtrusionScale 1.9
 ```
-![](img/terrain.png)
+![](img/terrain2.png)
 
 **buildings**
 
