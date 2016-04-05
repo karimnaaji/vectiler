@@ -58,12 +58,24 @@ $ cmake --build build
     --help                     Output help
 ```
 
-**example**
+**terrain**
+
+Terrain export is an experimental feature (data is only available in California).
+
+```
+./vectiler --tilex 5242/5260 --tiley 12642/12666 --tilez 15 --terrain 1 --buildings 1 --terrainExtrusionScale 1.5 --buildingsExtrusionScale 1.9
+```
+![](img/terrain.png)
+
+**buildings**
 
 Download one tile with ambiant occlusion baked in a texture:
 ```sh
 ./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
+
+![](img/vectiler.png)
+
 Output files are:
 - `[tilex].[tiley].[tilez].obj`: a simple mesh containing coordinates and normals
 - `[tilex].[tiley].[tilez]-ao.obj`: a mesh containing coordinates and texture uvs for ambiant occlusion rendering
@@ -73,8 +85,6 @@ Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
 ```sh
 ./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
 ```
-
-![](img/vectiler.png)
 
 **build and run the viewer (OS X)**
 
