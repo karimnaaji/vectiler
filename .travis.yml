@@ -1,0 +1,7 @@
+language: objective-c
+osx_image: xcode7
+script:
+    - cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula
+    - brew install embree tbb cmake
+    - cmake . -Bbuild
+    - cmake --build build
