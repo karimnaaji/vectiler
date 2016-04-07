@@ -1,5 +1,7 @@
 # vectiler
 
+[![Build Status](https://travis-ci.org/karimnaaji/vectiler.svg?branch=master)](https://travis-ci.org/karimnaaji/vectiler)
+
 A wavefront obj vector tile builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles).
 
 - build and export mesh in obj files based on tile coordinates (find your tiles of interest [here](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/))
