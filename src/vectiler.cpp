@@ -204,6 +204,26 @@ float sampleElevation(glm::vec2 position, const std::unique_ptr<HeightData>& tex
     return bilinearHeight;
 }
 
+glm::vec2 centroid(const std::vector<std::vector<glm::vec3>>& polygon) {
+    glm::vec2 centroid;
+    int n = 0;
+
+    for (auto& l : polygon) {
+        for (auto& p : l) {
+            centroid.x += p.x;
+            centroid.y += p.y;
+            n++;
+        }
+    }
+
+    if (n == 0) {
+        return centroid;
+    }
+
+    centroid /= n;
+    return centroid;
+}
+
 void buildPlane(std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
     float width,       // Total plane width (x-axis)
@@ -246,7 +266,7 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
     }
 }
 
-void buildPolygonExtrusion(const Polygon& polygon,
+float buildPolygonExtrusion(const Polygon& polygon,
     double minHeight,
     double height,
     std::vector<PolygonVertex>& outVertices,
@@ -257,6 +277,25 @@ void buildPolygonExtrusion(const Polygon& polygon,
     int vertexDataOffset = outVertices.size();
     glm::vec3 upVector(0.0f, 0.0f, 1.0f);
     glm::vec3 normalVector;
+    float minz = 0.f;
+    float cz = 0.f;
+
+    // Compute min and max height of the polygon
+    if (elevation) {
+        // The polygon centroid height
+        cz = sampleElevation(centroid(polygon), elevation);
+        minz = std::numeric_limits<float>::max();
+
+        for (auto& line : polygon) {
+            for (size_t i = 0; i < line.size(); i++) {
+                glm::vec3 p(line[i]);
+
+                float pz = sampleElevation(glm::vec2(p.x, p.y), elevation);
+
+                minz = std::min(minz, pz);
+            }
+        }
+    }
 
     for (auto& line : polygon) {
         size_t lineSize = line.size();
@@ -273,19 +312,13 @@ void buildPolygonExtrusion(const Polygon& polygon,
             normalVector = glm::cross(upVector, b - a);
             normalVector = glm::normalize(normalVector);
 
-            float az = sampleElevation(glm::vec2(a.x, a.y), elevation);
-            float bz = sampleElevation(glm::vec2(b.x, b.y), elevation);
-
-            az *= inverseTileScale;
-            bz *= inverseTileScale;
-
-            a.z = height + az;
+            a.z = height + cz * inverseTileScale;
             outVertices.push_back({a, normalVector});
-            b.z = height + bz;
+            b.z = height + cz * inverseTileScale;
             outVertices.push_back({b, normalVector});
-            a.z = minHeight + az;
+            a.z = minHeight + minz * inverseTileScale;
             outVertices.push_back({a, normalVector});
-            b.z = minHeight + bz;
+            b.z = minHeight + minz * inverseTileScale;
             outVertices.push_back({b, normalVector});
 
             outIndices.push_back(vertexDataOffset+0);
@@ -298,6 +331,8 @@ void buildPolygonExtrusion(const Polygon& polygon,
             vertexDataOffset += 4;
         }
     }
+
+    return cz;
 }
 
 void buildPolygon(const Polygon& polygon,
@@ -305,6 +340,7 @@ void buildPolygon(const Polygon& polygon,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
     const std::unique_ptr<HeightData>& elevation,
+    float centroidHeight,
     float inverseTileScale)
 {
     mapbox::Earcut<float, unsigned int> earcut;
@@ -331,15 +367,11 @@ void buildPolygon(const Polygon& polygon,
 
     outVertices.reserve(outVertices.size() + earcut.vertices.size());
 
+    centroidHeight *= inverseTileScale;
+
     for (auto& p : earcut.vertices) {
         glm::vec2 position(p[0], p[1]);
-
-        // TODO: use centroid of polygon and sample elevation once
-        float pz = sampleElevation(position, elevation);
-
-        pz *= inverseTileScale;
-
-        glm::vec3 coord(position.x, position.y, height + pz);
+        glm::vec3 coord(position.x, position.y, height + centroidHeight);
         outVertices.push_back({coord, normal});
     }
 }
@@ -559,26 +591,6 @@ bool saveOBJ(std::string outputOBJ,
     }
 
     return false;
-}
-
-glm::vec2 centroid(const std::vector<std::vector<glm::vec3>>& _polygon) {
-    glm::vec2 centroid;
-    int n = 0;
-
-    for (auto& l : _polygon) {
-        for (auto& p : l) {
-            centroid.x += p.x;
-            centroid.y += p.y;
-            n++;
-        }
-    }
-
-    if (n == 0) {
-        return centroid;
-    }
-
-    centroid /= n;
-    return centroid;
 }
 
 std::vector<std::string> splitString(const std::string& s, char delim) {
@@ -808,20 +820,21 @@ int vectiler(Params exportParams) {
                             minHeight = itMinHeight->second * scale;
                         }
 
-                        // Extrude landuse and water polygons
+                        // Extrude landuse
                         if (layer.name == "landuse") {
                             height = scale;
                         }
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
                         for (auto polygon : feature.polygons) {
+                            float centroidHeight = 0.f;
                             if (minHeight != height) {
-                                buildPolygonExtrusion(polygon, minHeight, height,
+                                centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
                                     mesh->vertices, mesh->indices, textureData, tile.invScale);
                             }
 
                             buildPolygon(polygon, height, mesh->vertices, mesh->indices,
-                                textureData, tile.invScale);
+                                textureData, centroidHeight, tile.invScale);
                         }
 
                         // Add local mesh offset
