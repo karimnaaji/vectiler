@@ -43,12 +43,6 @@ int main(int argc, const char **argv) {
     flag_int(&aoSamples, "aoSamples", "Number of samples for ambient occlusion");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    if (append && aoBaking) {
-        printf("Can't use options --append and --bakeAO altogether");
-        printf("Those option are currently exclusive");
-        return EXIT_FAILURE;
-    }
-
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale};
