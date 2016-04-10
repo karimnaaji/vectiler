@@ -9,6 +9,11 @@ A wavefront obj vector tile builder and exporter based on [mapzen](https://mapze
 
 ![](http://karim.naaji.fr/images/manhattan-ao.png)
 
+**export example**
+
+- https://sketchfab.com/models/e7ee1c0047ce4b5dbc768adcf7a7264e
+- https://sketchfab.com/models/693df3f9180942fba3f865e0d5ddc0ce
+
 **fetch submodules**
 
 First initialize submodules by running:
@@ -64,8 +69,8 @@ $ cmake --build build
 
 Terrain export is an experimental feature (data is only available in California).
 
-```
-./vectiler --tilex 5242/5260 --tiley 12642/12666 --tilez 15 --terrain 1 --buildings 1 --terrainExtrusionScale 1.5 --buildingsExtrusionScale 1.9
+```sh
+$ ./vectiler --tilex 5242/5260 --tiley 12642/12666 --tilez 15 --terrain 1 --buildings 1 --terrainExtrusionScale 1.5 --buildingsExtrusionScale 1.9
 ```
 ![](img/terrain2.png)
 
@@ -73,7 +78,7 @@ Terrain export is an experimental feature (data is only available in California)
 
 Download one tile with ambiant occlusion baked in a texture:
 ```sh
-./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
+$ ./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
 
 ![](img/vectiler.png)
@@ -85,7 +90,7 @@ Output files are:
 
 Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
 ```sh
-./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
+$ ./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
 ```
 
 **build and run the viewer (OS X)**
