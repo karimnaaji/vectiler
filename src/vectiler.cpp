@@ -33,7 +33,7 @@ struct PolygonMesh {
     glm::vec2 offset;
 };
 
-static size_t write_data(void* ptr, size_t size, size_t nmemb, void *stream) {
+static size_t writeData(void* ptr, size_t size, size_t nmemb, void *stream) {
     ((std::stringstream*) stream)->write(reinterpret_cast<char*>(ptr), size * nmemb);
     return size * nmemb;
 }
@@ -48,7 +48,7 @@ bool downloadData(std::stringstream& out, const std::string& url) {
         curlInitialized = true;
 
         // set up curl to perform fetch
-        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeData);
         curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
         curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
         curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
@@ -59,7 +59,7 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
     curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
 
-    printf("URL request: %s ", url.c_str());
+    printf("URL request: %s", url.c_str());
 
     CURLcode result = curl_easy_perform(curlHandle);
 
@@ -257,6 +257,7 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
             outVertices.push_back({v2, up});
             outVertices.push_back({v3, up});
 
+            // FIXME: probably a bad index order
             outIndices.push_back(indexOffset+0);
             outIndices.push_back(indexOffset+1);
             outIndices.push_back(indexOffset+2);
@@ -377,6 +378,138 @@ void buildPolygon(const Polygon& polygon,
         glm::vec3 coord(position.x, position.y, height + centroidHeight);
         outVertices.push_back({coord, normal});
     }
+}
+
+glm::vec3 perp(const glm::vec3& v1, const glm::vec3& v2) {
+    return glm::normalize(glm::vec3(v2.y - v1.y, v1.x - v2.x, 0.0));
+}
+
+void addPolylineIndices(std::vector<unsigned int>& outIndices, size_t vertexDataOffset) {
+    outIndices.push_back(vertexDataOffset+0);
+    outIndices.push_back(vertexDataOffset+2);
+    outIndices.push_back(vertexDataOffset+1);
+    outIndices.push_back(vertexDataOffset+1);
+    outIndices.push_back(vertexDataOffset+2);
+    outIndices.push_back(vertexDataOffset+3);
+}
+
+void addPolylineMitterIndices(std::vector<unsigned int>& outIndices, size_t vertexDataOffset) {
+    outIndices.push_back(vertexDataOffset+0);
+    outIndices.push_back(vertexDataOffset+1);
+    outIndices.push_back(vertexDataOffset+2);
+}
+
+void buildPolyline(const Line& line,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    float inverseTileScale)
+{
+    // TODO: give as param
+    const static float scale = 5.0;
+    const static glm::vec3 normal = glm::vec3(0.0, 0.0, 1.0);
+
+    float extrude = scale * inverseTileScale;
+
+    glm::vec3 currentVertex(line[0]);
+    glm::vec3 nextVertex(line[1]);
+
+    if (currentVertex == nextVertex) {
+        return;
+    }
+
+    glm::vec3 n0 = perp(currentVertex, nextVertex);
+
+    size_t vertexDataOffset = outVertices.size();
+
+    currentVertex.z = 0.02;
+
+    outVertices.push_back({currentVertex + n0 * extrude, normal});
+    outVertices.push_back({currentVertex - n0 * extrude, normal});
+
+    glm::vec3 lastVertex;
+    glm::vec3 lastNormal;
+
+    for (size_t i = 1; i < line.size() - 1; ++i) {
+        lastVertex = currentVertex;
+        lastNormal = n0;
+
+        currentVertex = line[i];
+        nextVertex = line[i+1];
+
+        // TODO: make configurable
+        currentVertex.z = 0.02;
+        nextVertex.z = 0.02;
+
+        if (currentVertex == nextVertex) {
+            continue;
+        }
+
+        n0 = perp(lastVertex, currentVertex);
+        glm::vec3 n1 = perp(currentVertex, nextVertex);
+
+        bool rightTurn = glm::cross(n1, n0).z > 0.0;
+
+        glm::vec3 mitter = n0 + n1;
+
+        mitter *= sqrtf(2.0f / (1.0f + glm::dot(n0, n1)) / glm::dot(mitter, mitter));
+
+        if (rightTurn) {
+            outVertices.push_back({currentVertex + mitter * extrude, normal});
+            outVertices.push_back({currentVertex - lastNormal * extrude, normal});
+
+            addPolylineIndices(outIndices, vertexDataOffset);
+
+            vertexDataOffset += 4;
+
+            // Add mitter triangle
+            outVertices.push_back({currentVertex + mitter * extrude, normal});
+            outVertices.push_back({currentVertex - n1 * extrude, normal});
+            outVertices.push_back({currentVertex - lastNormal * extrude, normal});
+
+            addPolylineMitterIndices(outIndices, vertexDataOffset);
+
+            vertexDataOffset += 3;
+
+            outVertices.push_back({currentVertex + mitter * extrude, normal});
+            outVertices.push_back({currentVertex - n1 * extrude, normal});
+        } else {
+            outVertices.push_back({currentVertex + lastNormal * extrude, normal});
+            outVertices.push_back({currentVertex - mitter * extrude, normal});
+
+            addPolylineIndices(outIndices, vertexDataOffset);
+
+            vertexDataOffset += 4;
+
+            outVertices.push_back({currentVertex - mitter * extrude, normal});
+            outVertices.push_back({currentVertex + lastNormal * extrude, normal});
+            outVertices.push_back({currentVertex + n1 * extrude, normal});
+
+            addPolylineMitterIndices(outIndices, vertexDataOffset);
+
+            vertexDataOffset += 3;
+
+            outVertices.push_back({currentVertex + n1 * extrude, normal});
+            outVertices.push_back({currentVertex - mitter * extrude, normal});
+        }
+    }
+
+    lastVertex = currentVertex;
+    currentVertex = nextVertex;
+
+    if (currentVertex == lastVertex) {
+        outVertices.pop_back();
+        outVertices.pop_back();
+        return;
+    }
+
+    currentVertex.z = 0.02;
+
+    n0 = perp(lastVertex, currentVertex);
+
+    outVertices.push_back({currentVertex + n0 * extrude, normal});
+    outVertices.push_back({currentVertex - n0 * extrude, normal});
+
+    addPolylineIndices(outIndices, vertexDataOffset);
 }
 
 void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
@@ -823,7 +956,8 @@ int vectiler(Params exportParams) {
                         }
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
-                        for (auto polygon : feature.polygons) {
+
+                        for (const Polygon& polygon : feature.polygons) {
                             float centroidHeight = 0.f;
                             if (minHeight != height) {
                                 centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
@@ -832,6 +966,12 @@ int vectiler(Params exportParams) {
 
                             buildPolygon(polygon, height, mesh->vertices, mesh->indices,
                                 textureData, centroidHeight, tile.invScale);
+                        }
+
+                        if (layer.name == "roads" ) {
+                            for (const Line& line : feature.lines) {
+                                buildPolyline(line, mesh->vertices, mesh->indices, tile.invScale);
+                            }
                         }
 
                         // Add local mesh offset
