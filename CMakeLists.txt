@@ -70,8 +70,12 @@ include_directories(${INCLUDE_DIRS})
 add_library(vectiler ${VECTILER_SOURCES})
 
 add_executable(vectiler.out ${C_SOURCES})
-target_link_libraries(vectiler.out ${LIBS} aobaker thekla_atlas embree tbb vectiler)
+
+set(VECTILER_LIBS aobaker thekla_atlas embree tbb ${LIBS})
+
+target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
 
 if (BUILD_TESTS)
+    message(STATUS "Build unit tests")
     add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
 endif()

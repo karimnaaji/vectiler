@@ -399,7 +399,31 @@ void addPolylineMitterIndices(std::vector<unsigned int>& outIndices, size_t vert
     outIndices.push_back(vertexDataOffset+2);
 }
 
-void buildPolyline(const Line& line,
+void subdivideLine(Line& line, float subdivision) {
+    float subdivisionStep = 1.0 / subdivision;
+
+    auto it = line.begin();
+
+    for (int i = 0; i < line.size() - 1; ++i) {
+        glm::vec3 p0 = line[i];
+        glm::vec3 p1 = line[i+1];
+        glm::vec3 dir = glm::normalize(p1 - p0);
+        float distance = glm::distance(p0, p1);
+
+        if (distance > subdivisionStep) {
+            int steps = distance / subdivisionStep;
+            float step = distance / steps;
+
+            for (int s = 1; s < steps; ++s) {
+                glm::vec3 np = p0 + dir * step * (float)s;
+                it = line.insert(it + 1, np);
+                i++;
+            }
+        }
+    }
+}
+
+void buildPolyline(Line& line,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
     float inverseTileScale)
