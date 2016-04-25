@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VECTILER_H
+#define VECTILER_H
 
 struct Params {
     const char* filename;
@@ -17,6 +18,9 @@ struct Params {
     float terrainExtrusionScale;
     bool buildings;
     float buildingsExtrusionScale;
+    bool roads;
+    float roadsHeight;
+    float roadsExtrusionWidth;
 };
 
 #ifdef __cplusplus
@@ -32,4 +36,6 @@ int vectiler(struct Params parameters);
 #ifdef VECTILER_UNIT_TESTS
 #include "tiledata.h"
 void subdivideLine(Line& line, float subdivision);
+#endif
+
 #endif

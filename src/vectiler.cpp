@@ -16,6 +16,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define EPSILON 1e-5f
+
 struct PolygonVertex {
     glm::vec3 position;
     glm::vec3 normal;
@@ -423,46 +425,100 @@ void subdivideLine(Line& line, float subdivision) {
     }
 }
 
+float triangleArea(const glm::vec3 p1, const glm::vec3& p2, const glm::vec3& p3) {
+    glm::vec3 ab = p2 - p1;
+    glm::vec3 ac = p3 - p1;
+
+    float a0 = ab.y * ac.z - ab.z * ac.y;
+    float a1 = ab.z * ac.x - ab.x * ac.z;
+    float a2 = ab.x * ac.y - ab.y * ac.x;
+
+    return sqrtf(powf(a0, 2.f) + powf(a1, 2.f) + powf(a2, 2.f)) * 0.5f;
+}
+
+size_t addTriangleJoint(const glm::vec3& currentVertex,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    const float extrude,
+    const glm::vec3& miter,
+    const glm::vec3& n1,
+    const glm::vec3& lastNormal,
+    const glm::vec3& normal,
+    size_t vertexDataOffset,
+    bool cw)
+{
+    glm::vec3 p1, p2, p3;
+
+    if (cw) {
+        p1 = currentVertex + miter * extrude;
+        p2 = currentVertex - n1 * extrude;
+        p3 = currentVertex - lastNormal * extrude;
+    } else {
+        p1 = currentVertex - miter * extrude;
+        p2 = currentVertex + lastNormal * extrude;
+        p3 = currentVertex + n1 * extrude;
+    }
+
+    if (triangleArea(p1, p2, p3) > std::numeric_limits<float>::epsilon()) {
+        outVertices.push_back({p1, normal});
+        outVertices.push_back({p2, normal});
+        outVertices.push_back({p3, normal});
+
+        addPolylineMitterIndices(outIndices, vertexDataOffset);
+
+        return 3;
+    }
+
+    return 0;
+}
+
 void buildPolyline(Line& line,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
-    float inverseTileScale)
+    float inverseTileScale,
+    const std::unique_ptr<HeightData>& elevation,
+    float subdivision,
+    float roadsHeight,
+    float roadsExtrusionWidth)
 {
-    // TODO: give as param
-    const static float scale = 5.0;
+    std::vector<PolygonVertex> vertices;
+    std::vector<unsigned int> indices;
+
     const static glm::vec3 normal = glm::vec3(0.0, 0.0, 1.0);
 
-    float extrude = scale * inverseTileScale;
+    // subdivideLine(line, subdivision);
+
+    float extrude = roadsExtrusionWidth * inverseTileScale;
 
     glm::vec3 currentVertex(line[0]);
     glm::vec3 nextVertex(line[1]);
 
-    if (currentVertex == nextVertex) {
-        return;
+    int i = 1;
+    while (currentVertex == nextVertex) {
+        currentVertex = line[i];
+        nextVertex = line[i+1];
+        if (i++ >= line.size() - 1) {
+            return;
+        }
     }
 
     glm::vec3 n0 = perp(currentVertex, nextVertex);
 
     size_t vertexDataOffset = outVertices.size();
+    const size_t offset = outVertices.size();
 
-    currentVertex.z = 0.02;
-
-    outVertices.push_back({currentVertex + n0 * extrude, normal});
-    outVertices.push_back({currentVertex - n0 * extrude, normal});
+    vertices.push_back({currentVertex + n0 * extrude, normal});
+    vertices.push_back({currentVertex - n0 * extrude, normal});
 
     glm::vec3 lastVertex;
     glm::vec3 lastNormal;
 
-    for (size_t i = 1; i < line.size() - 1; ++i) {
+    for (; i < line.size() - 1; ++i) {
         lastVertex = currentVertex;
         lastNormal = n0;
 
         currentVertex = line[i];
         nextVertex = line[i+1];
-
-        // TODO: make configurable
-        currentVertex.z = 0.02;
-        nextVertex.z = 0.02;
 
         if (currentVertex == nextVertex) {
             continue;
@@ -471,69 +527,92 @@ void buildPolyline(Line& line,
         n0 = perp(lastVertex, currentVertex);
         glm::vec3 n1 = perp(currentVertex, nextVertex);
 
-        bool rightTurn = glm::cross(n1, n0).z > 0.0;
+        bool cw = glm::cross(n1, n0).z > 0.0;
 
-        glm::vec3 mitter = n0 + n1;
+        glm::vec3 miter = n0 + n1;
 
-        mitter *= sqrtf(2.0f / (1.0f + glm::dot(n0, n1)) / glm::dot(mitter, mitter));
+        float scale = 1.f;
+        float miterLength2 = glm::dot(miter, miter);
 
-        if (rightTurn) {
-            outVertices.push_back({currentVertex + mitter * extrude, normal});
-            outVertices.push_back({currentVertex - lastNormal * extrude, normal});
-
-            addPolylineIndices(outIndices, vertexDataOffset);
-
-            vertexDataOffset += 4;
-
-            // Add mitter triangle
-            outVertices.push_back({currentVertex + mitter * extrude, normal});
-            outVertices.push_back({currentVertex - n1 * extrude, normal});
-            outVertices.push_back({currentVertex - lastNormal * extrude, normal});
-
-            addPolylineMitterIndices(outIndices, vertexDataOffset);
-
-            vertexDataOffset += 3;
-
-            outVertices.push_back({currentVertex + mitter * extrude, normal});
-            outVertices.push_back({currentVertex - n1 * extrude, normal});
+        if (miterLength2 < std::numeric_limits<float>::epsilon()) {
+            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
         } else {
-            outVertices.push_back({currentVertex + lastNormal * extrude, normal});
-            outVertices.push_back({currentVertex - mitter * extrude, normal});
+            scale = sqrtf(2.0f / (1.0f + glm::dot(n0, n1)) / miterLength2);
+        }
 
-            addPolylineIndices(outIndices, vertexDataOffset);
+        miter *= scale;
+
+        if (cw) {
+            vertices.push_back({currentVertex + miter * extrude, normal});
+            vertices.push_back({currentVertex - lastNormal * extrude, normal});
+
+            addPolylineIndices(indices, vertexDataOffset);
 
             vertexDataOffset += 4;
 
-            outVertices.push_back({currentVertex - mitter * extrude, normal});
-            outVertices.push_back({currentVertex + lastNormal * extrude, normal});
-            outVertices.push_back({currentVertex + n1 * extrude, normal});
+            if (std::abs(glm::dot(n0, n1)) < 1.0 - EPSILON) {
+                vertexDataOffset += addTriangleJoint(currentVertex, vertices, indices, extrude,
+                    miter, n1, lastNormal, normal, vertexDataOffset, true);
+            }
 
-            addPolylineMitterIndices(outIndices, vertexDataOffset);
+            vertices.push_back({currentVertex + miter * extrude, normal});
+            vertices.push_back({currentVertex - n1 * extrude, normal});
+        } else {
+            vertices.push_back({currentVertex + lastNormal * extrude, normal});
+            vertices.push_back({currentVertex - miter * extrude, normal});
 
-            vertexDataOffset += 3;
+            addPolylineIndices(indices, vertexDataOffset);
 
-            outVertices.push_back({currentVertex + n1 * extrude, normal});
-            outVertices.push_back({currentVertex - mitter * extrude, normal});
+            vertexDataOffset += 4;
+
+            if (std::abs(glm::dot(n0, n1)) < 1.0 - EPSILON) {
+                vertexDataOffset += addTriangleJoint(currentVertex, vertices, indices, extrude,
+                    miter, n1, lastNormal, normal, vertexDataOffset, false);
+            }
+
+            vertices.push_back({currentVertex + n1 * extrude, normal});
+            vertices.push_back({currentVertex - miter * extrude, normal});
         }
     }
 
     lastVertex = currentVertex;
     currentVertex = nextVertex;
 
-    if (currentVertex == lastVertex) {
-        outVertices.pop_back();
-        outVertices.pop_back();
+    if (currentVertex != lastVertex) {
+        n0 = perp(lastVertex, currentVertex);
+
+        vertices.push_back({currentVertex + n0 * extrude, normal});
+        vertices.push_back({currentVertex - n0 * extrude, normal});
+
+        addPolylineIndices(indices, vertexDataOffset);
+    } else {
+        vertices.pop_back();
+        vertices.pop_back();
+    }
+
+    if (vertices.size() == 0) {
         return;
     }
 
-    currentVertex.z = 0.02;
+#if 0
+    for (const auto& v : vertices) {
+        assert(!std::isnan(v.position.x) && !std::isnan(v.position.y));
+    }
+#endif
 
-    n0 = perp(lastVertex, currentVertex);
-
-    outVertices.push_back({currentVertex + n0 * extrude, normal});
-    outVertices.push_back({currentVertex - n0 * extrude, normal});
-
-    addPolylineIndices(outIndices, vertexDataOffset);
+    outVertices.insert(outVertices.end(), vertices.begin(), vertices.end());
+    outIndices.insert(outIndices.end(), indices.begin(), indices.end());
+    
+    for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
+        it->position.z = roadsHeight * inverseTileScale;
+    }
+    
+    if (elevation) {
+        for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
+            it->position.z = sampleElevation(glm::vec2(it->position.x, it->position.y),
+                elevation) * inverseTileScale;
+        }
+    }
 }
 
 void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
@@ -568,8 +647,6 @@ void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& h
                     tileHeight1->elevation[x][0] = h;
                 }
             }
-
-            // TODO: Corner point
         }
     }
 }
@@ -855,7 +932,7 @@ int vectiler(Params exportParams) {
                 heightData[tile] = std::move(textureData);
             }
 
-            if (exportParams.buildings) {
+            if (exportParams.buildings || exportParams.roads) {
                std::string url = vectorTileURL(tile, apiKey);
 
                 auto tileData = downloadTile(url, tile);
@@ -947,7 +1024,7 @@ int vectiler(Params exportParams) {
         }
 
         /// Build vector tile mesh
-        if (exportParams.buildings) {
+        if (exportParams.buildings || exportParams.roads) {
             const auto& data = vectorTileData[tile];
 
             if (data) {
@@ -956,11 +1033,7 @@ int vectiler(Params exportParams) {
 
                 for (auto layer : data->layers) {
                     for (auto feature : layer.features) {
-                        // Coupled with terrain data, only export layer buildings for now
-                        if (textureData && layer.name != "buildings") {
-                            continue;
-                        }
-
+                        if (textureData && layer.name != "buildings" && layer.name != "roads") { continue; }
                         auto itHeight = feature.props.numericProps.find(keyHeight);
                         auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
                         float scale = tile.invScale * exportParams.buildingsExtrusionScale;
@@ -971,7 +1044,7 @@ int vectiler(Params exportParams) {
                             height = itHeight->second * scale;
                         }
 
-                        if (textureData && height == 0.0) {
+                        if (textureData && layer.name != "roads" && height == 0.0) {
                             continue;
                         }
 
@@ -981,20 +1054,24 @@ int vectiler(Params exportParams) {
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
 
-                        for (const Polygon& polygon : feature.polygons) {
-                            float centroidHeight = 0.f;
-                            if (minHeight != height) {
-                                centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
-                                    mesh->vertices, mesh->indices, textureData, tile.invScale);
-                            }
+                        if (exportParams.buildings) {
+                            for (const Polygon& polygon : feature.polygons) {
+                                float centroidHeight = 0.f;
+                                if (minHeight != height) {
+                                    centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
+                                        mesh->vertices, mesh->indices, textureData, tile.invScale);
+                                }
 
-                            buildPolygon(polygon, height, mesh->vertices, mesh->indices,
-                                textureData, centroidHeight, tile.invScale);
+                                buildPolygon(polygon, height, mesh->vertices, mesh->indices,
+                                    textureData, centroidHeight, tile.invScale);
+                            }
                         }
 
-                        if (layer.name == "roads" ) {
-                            for (const Line& line : feature.lines) {
-                                buildPolyline(line, mesh->vertices, mesh->indices, tile.invScale);
+                        if (layer.name == "roads" && exportParams.roads) {
+                            for (Line& line : feature.lines) {
+                                buildPolyline(line, mesh->vertices, mesh->indices, tile.invScale,
+                                    textureData, exportParams.terrainSubdivision,
+                                    exportParams.roadsHeight, exportParams.roadsExtrusionWidth);
                             }
                         }
 
