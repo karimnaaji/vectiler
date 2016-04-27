@@ -40,21 +40,24 @@ static size_t write_data(void* ptr, size_t size, size_t nmemb, void *stream) {
 
 bool downloadData(std::stringstream& out, const std::string& url) {
     static bool curlInitialized = false;
+    static CURL* curlHandle = nullptr;
+
     if (!curlInitialized) {
         curl_global_init(CURL_GLOBAL_DEFAULT);
+        curlHandle = curl_easy_init();
         curlInitialized = true;
+
+        // set up curl to perform fetch
+        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
+        curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
+        curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
+        curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
+        curl_easy_setopt(curlHandle, CURLOPT_DNS_CACHE_TIMEOUT, -1);
     }
 
-    CURL* curlHandle = curl_easy_init();
-
-    // set up curl to perform fetch
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
     curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
-    curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
-    curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
-    curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
 
     printf("URL request: %s ", url.c_str());
 
@@ -795,7 +798,6 @@ int vectiler(Params exportParams) {
                 const static std::string keyMinHeight("min_height");
 
                 for (auto layer : data->layers) {
-                    // TODO: give layer as parameter, to filter
                     for (auto feature : layer.features) {
                         // Coupled with terrain data, only export layer buildings for now
                         if (textureData && layer.name != "buildings") {
@@ -818,11 +820,6 @@ int vectiler(Params exportParams) {
 
                         if (itMinHeight != feature.props.numericProps.end()) {
                             minHeight = itMinHeight->second * scale;
-                        }
-
-                        // Extrude landuse
-                        if (layer.name == "landuse") {
-                            height = scale;
                         }
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
