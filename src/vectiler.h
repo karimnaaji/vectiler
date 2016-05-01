@@ -21,6 +21,7 @@ struct Params {
     bool roads;
     float roadsHeight;
     float roadsExtrusionWidth;
+    bool normals;
 };
 
 #ifdef __cplusplus

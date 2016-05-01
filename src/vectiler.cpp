@@ -651,6 +651,36 @@ void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& h
     }
 }
 
+void addFaces(std::ostream& file, const PolygonMesh& mesh, size_t indexOffset, bool normals) {
+    for (int i = 0; i < mesh.indices.size(); i += 3) {
+        file << "f " << mesh.indices[i] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i] + indexOffset + 1) : "");
+        file << " ";
+        file << mesh.indices[i+1] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i+1] + indexOffset + 1) : "");
+        file << " ";
+        file << mesh.indices[i+2] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i+2] + indexOffset + 1) : "");
+        file << "\n";
+    }
+}
+
+void addNormals(std::ostream& file, const PolygonMesh& mesh) {
+    for (auto vertex : mesh.vertices) {
+        file << "vn " << vertex.normal.x << " "
+             << vertex.normal.y << " "
+             << vertex.normal.z << "\n";
+    }
+}
+
+void addPositions(std::ostream& file, const PolygonMesh& mesh, float offsetx, float offsety) {
+    for (auto vertex : mesh.vertices) {
+        file << "v " << vertex.position.x + offsetx + mesh.offset.x << " "
+             << vertex.position.y + offsety + mesh.offset.y << " "
+             << vertex.position.z << "\n";
+    }
+}
+
 /*
  * Save an obj file for the set of meshes
  * - outputOBJ: the output filename of the wavefront object file
@@ -665,7 +695,8 @@ bool saveOBJ(std::string outputOBJ,
     std::vector<std::unique_ptr<PolygonMesh>>& meshes,
     float offsetx,
     float offsety,
-    bool append)
+    bool append,
+    bool normals)
 {
     /// Cleanup mesh from degenerate points
     {
@@ -752,30 +783,16 @@ bool saveOBJ(std::string outputOBJ,
 
                     file << "o mesh" << meshCnt++ << "\n";
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
-                             << vertex.position.y + offsety + mesh->offset.y << " "
-                             << vertex.position.z << "\n";
+                    addPositions(file, *mesh, offsetx, offsety);
+
+                    if (normals) {
+                        addNormals(file, *mesh);
                     }
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "vn " << vertex.normal.x << " "
-                             << vertex.normal.y << " "
-                             << vertex.normal.z << "\n";
-                    }
-
-                    for (int i = 0; i < mesh->indices.size(); i += 3) {
-                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
-                             << mesh->indices[i] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
-                             << mesh->indices[i+1] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
-                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
-                    }
+                    addFaces(file, *mesh, indexOffset, normals);
 
                     file << "\n";
+
                     indexOffset += mesh->vertices.size();
                 }
             } else {
@@ -783,38 +800,19 @@ bool saveOBJ(std::string outputOBJ,
 
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
+                    addPositions(file, *mesh, offsetx, offsety);
+                }
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
-                             << vertex.position.y + offsety + mesh->offset.y << " "
-                             << vertex.position.z << "\n";
+                if (normals) {
+                    for (const auto& mesh : meshes) {
+                        if (mesh->vertices.size() == 0) { continue; }
+                        addNormals(file, *mesh);
                     }
                 }
 
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
-
-                    for (auto vertex : mesh->vertices) {
-                        file << "vn " << vertex.normal.x << " "
-                             << vertex.normal.y << " "
-                             << vertex.normal.z << "\n";
-                    }
-                }
-
-                for (const auto& mesh : meshes) {
-                    if (mesh->vertices.size() == 0) { continue; }
-
-                    for (int i = 0; i < mesh->indices.size(); i += 3) {
-                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
-                             << mesh->indices[i] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
-                             << mesh->indices[i+1] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
-                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
-                    }
-
+                    addFaces(file, *mesh, indexOffset, normals);
                     indexOffset += mesh->vertices.size();
                 }
             }
@@ -996,7 +994,7 @@ int vectiler(Params exportParams) {
                 }
 
                 /// Compute faces normals
-                {
+                if (exportParams.normals) {
                     for (size_t i = 0; i < mesh->indices.size(); i += 3) {
                         int i1 = mesh->indices[i+0];
                         int i2 = mesh->indices[i+1];
@@ -1101,7 +1099,8 @@ int vectiler(Params exportParams) {
         exportParams.splitMesh, meshes,
         exportParams.offset[0],
         exportParams.offset[1],
-        exportParams.append);
+        exportParams.append,
+        exportParams.normals);
 
     if (!saved) {
         return EXIT_FAILURE;
