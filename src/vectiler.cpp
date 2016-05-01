@@ -602,11 +602,11 @@ void buildPolyline(Line& line,
 
     outVertices.insert(outVertices.end(), vertices.begin(), vertices.end());
     outIndices.insert(outIndices.end(), indices.begin(), indices.end());
-    
+
     for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
         it->position.z = roadsHeight * inverseTileScale;
     }
-    
+
     if (elevation) {
         for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
             it->position.z = sampleElevation(glm::vec2(it->position.x, it->position.y),
@@ -1108,16 +1108,69 @@ int vectiler(Params exportParams) {
 
     // Bake ambiant occlusion using AO Baker
     if (exportParams.aoBaking) {
-        bool aoBaked = aobaker_bake(outputOBJ.c_str(),
-            (outFile + "-ao.obj").c_str(),
-            (outFile + ".png").c_str(),
-            exportParams.aoSizeHint,
-            exportParams.aoSamples,
+        std::string aoFile = outFile + "-ao.obj";
+        std::string aoImageFile = outFile + ".png";
+        std::string aoMaterialFile = outFile + ".mtl";
+
+        bool aoBaked = aobaker_bake(outputOBJ.c_str(), aoFile.c_str(), aoImageFile.c_str(),
+            exportParams.aoSizeHint, exportParams.aoSamples,
             false,  // g-buffers
             false,  // charinfo
             1.0);   // multiply
 
-        return aoBaked;
+        bool success = aoBaked;
+        std::string aoFileData;
+
+        {
+            std::ifstream ifile(aoFile);
+            success &= ifile.is_open();
+
+            if (success) {
+                aoFileData = std::string((std::istreambuf_iterator<char>(ifile)),
+                        (std::istreambuf_iterator<char>()));
+                ifile.close();
+            }
+        }
+
+        // Inject material to wavefront
+        {
+            std::ofstream ofile = std::ofstream(aoFile);
+            success &= ofile.is_open();
+
+            if (success) {
+                std::string materialHeader;
+                materialHeader += "mtllib " + aoMaterialFile + "\n";
+                materialHeader += "usemtl tile_mtl\n\n";
+                ofile << materialHeader;
+                ofile << aoFileData;
+                ofile.close();
+            }
+        }
+
+
+        // Export material properties
+        {
+            std::ofstream materialfile = std::ofstream(aoMaterialFile);
+            success &= materialfile.is_open();
+
+            if (success) {
+                printf("Saving material file %s\n", aoMaterialFile.c_str());
+                std::string material = R"END(
+                    newmtl tile_mtl
+                    Ka 0.0000 0.0000 0.0000
+                    Kd 1.0000 1.0000 1.0000
+                    Ks 0.0000 0.0000 0.0000
+                    d 1.0
+                    map_Kd )END";
+                material += aoImageFile;
+                materialfile << material;
+                materialfile.close();
+            }
+        }
+
+        if (!success) {
+            return EXIT_FAILURE;
+        }
     }
 
     return EXIT_SUCCESS;
