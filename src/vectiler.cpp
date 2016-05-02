@@ -74,6 +74,28 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     return result == CURLE_OK;
 }
 
+void computeNormals(PolygonMesh& mesh) {
+    for (size_t i = 0; i < mesh.indices.size(); i += 3) {
+        int i1 = mesh.indices[i+0];
+        int i2 = mesh.indices[i+1];
+        int i3 = mesh.indices[i+2];
+        
+        const glm::vec3& v1 = mesh.vertices[i1].position;
+        const glm::vec3& v2 = mesh.vertices[i2].position;
+        const glm::vec3& v3 = mesh.vertices[i3].position;
+        
+        glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+        
+        mesh.vertices[i1].normal += d;
+        mesh.vertices[i2].normal += d;
+        mesh.vertices[i3].normal += d;
+    }
+    
+    for (auto& v : mesh.vertices) {
+        v.normal = glm::normalize(v.normal);
+    }
+}
+
 std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
     const Tile& tile,
     float extrusionScale)
@@ -409,6 +431,9 @@ void subdivideLine(Line& line, float subdivision) {
     for (int i = 0; i < line.size() - 1; ++i) {
         glm::vec3 p0 = line[i];
         glm::vec3 p1 = line[i+1];
+
+        if (p0 == p1) { continue; }
+
         glm::vec3 dir = glm::normalize(p1 - p0);
         float distance = glm::distance(p0, p1);
 
@@ -609,7 +634,7 @@ void buildPolyline(Line& line,
 
     if (elevation) {
         for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
-            it->position.z = sampleElevation(glm::vec2(it->position.x, it->position.y),
+            it->position.z += sampleElevation(glm::vec2(it->position.x, it->position.y),
                 elevation) * inverseTileScale;
         }
     }
@@ -995,25 +1020,7 @@ int vectiler(Params exportParams) {
 
                 /// Compute faces normals
                 if (exportParams.normals) {
-                    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-                        int i1 = mesh->indices[i+0];
-                        int i2 = mesh->indices[i+1];
-                        int i3 = mesh->indices[i+2];
-
-                        const glm::vec3& v1 = mesh->vertices[i1].position;
-                        const glm::vec3& v2 = mesh->vertices[i2].position;
-                        const glm::vec3& v3 = mesh->vertices[i3].position;
-
-                        glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
-
-                        mesh->vertices[i1].normal += d;
-                        mesh->vertices[i2].normal += d;
-                        mesh->vertices[i3].normal += d;
-                    }
-
-                    for (auto& v : mesh->vertices) {
-                        v.normal = glm::normalize(v.normal);
-                    }
+                    computeNormals(*mesh);
                 }
 
                 mesh->offset = offset;
@@ -1070,6 +1077,10 @@ int vectiler(Params exportParams) {
                                 buildPolyline(line, mesh->vertices, mesh->indices, tile.invScale,
                                     textureData, exportParams.terrainSubdivision,
                                     exportParams.roadsHeight, exportParams.roadsExtrusionWidth);
+                            }
+
+                            if (exportParams.normals && exportParams.terrain) {
+                                computeNormals(*mesh);
                             }
                         }
 
