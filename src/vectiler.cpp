@@ -281,7 +281,6 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
             outVertices.push_back({v2, up});
             outVertices.push_back({v3, up});
 
-            // FIXME: probably a bad index order
             outIndices.push_back(indexOffset+0);
             outIndices.push_back(indexOffset+1);
             outIndices.push_back(indexOffset+2);
@@ -795,6 +794,9 @@ bool saveOBJ(std::string outputOBJ,
         }
 
         if (file.is_open()) {
+            size_t nVertex = 0;
+            size_t nTriangles = 0;
+
             file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
             file << "\n";
 
@@ -809,12 +811,14 @@ bool saveOBJ(std::string outputOBJ,
                     file << "o mesh" << meshCnt++ << "\n";
 
                     addPositions(file, *mesh, offsetx, offsety);
+                    nVertex += mesh->vertices.size();
 
                     if (normals) {
                         addNormals(file, *mesh);
                     }
 
                     addFaces(file, *mesh, indexOffset, normals);
+                    nTriangles += mesh->indices.size() / 3;
 
                     file << "\n";
 
@@ -826,6 +830,7 @@ bool saveOBJ(std::string outputOBJ,
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
                     addPositions(file, *mesh, offsetx, offsety);
+                    nVertex += mesh->vertices.size();
                 }
 
                 if (normals) {
@@ -839,11 +844,26 @@ bool saveOBJ(std::string outputOBJ,
                     if (mesh->vertices.size() == 0) { continue; }
                     addFaces(file, *mesh, indexOffset, normals);
                     indexOffset += mesh->vertices.size();
+                    nTriangles += mesh->indices.size() / 3;
                 }
             }
 
             file.close();
-            printf("Saved obj file %s\n", outputOBJ.c_str());
+
+            // Print infos
+            {
+                printf("Saved obj file: %s\n", outputOBJ.c_str());
+                printf("Triangles: %ld\n", nTriangles);
+                printf("Vertices: %ld\n", nVertex);
+
+                std::ifstream in(outputOBJ, std::ifstream::ate | std::ifstream::binary);
+                if (in.is_open()) {
+                    int size = (int)in.tellg();
+                    printf("File size: %fmb\n", float(size) / (1024 * 1024));
+                    in.close();
+                }
+            }
+
             return true;
         } else {
             printf("Can't open file %s\n", outputOBJ.c_str());
