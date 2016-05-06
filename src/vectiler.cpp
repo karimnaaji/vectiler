@@ -403,23 +403,8 @@ void buildPolygon(const Polygon& polygon,
     }
 }
 
-glm::vec3 perp(const glm::vec3& v1, const glm::vec3& v2) {
-    return glm::normalize(glm::vec3(v2.y - v1.y, v1.x - v2.x, 0.0));
-}
-
-void addPolylineIndices(std::vector<unsigned int>& outIndices, size_t vertexDataOffset) {
-    outIndices.push_back(vertexDataOffset+0);
-    outIndices.push_back(vertexDataOffset+2);
-    outIndices.push_back(vertexDataOffset+1);
-    outIndices.push_back(vertexDataOffset+1);
-    outIndices.push_back(vertexDataOffset+2);
-    outIndices.push_back(vertexDataOffset+3);
-}
-
-void addPolylineMitterIndices(std::vector<unsigned int>& outIndices, size_t vertexDataOffset) {
-    outIndices.push_back(vertexDataOffset+0);
-    outIndices.push_back(vertexDataOffset+1);
-    outIndices.push_back(vertexDataOffset+2);
+glm::vec3 perp(const glm::vec3& v) {
+    return glm::normalize(glm::vec3(-v.y, v.x, 0.0));
 }
 
 void subdivideLine(Line& line, float subdivision) {
@@ -445,196 +430,6 @@ void subdivideLine(Line& line, float subdivision) {
                 it = line.insert(it + 1, np);
                 i++;
             }
-        }
-    }
-}
-
-float triangleArea(const glm::vec3 p1, const glm::vec3& p2, const glm::vec3& p3) {
-    glm::vec3 ab = p2 - p1;
-    glm::vec3 ac = p3 - p1;
-
-    float a0 = ab.y * ac.z - ab.z * ac.y;
-    float a1 = ab.z * ac.x - ab.x * ac.z;
-    float a2 = ab.x * ac.y - ab.y * ac.x;
-
-    return sqrtf(powf(a0, 2.f) + powf(a1, 2.f) + powf(a2, 2.f)) * 0.5f;
-}
-
-size_t addTriangleJoint(const glm::vec3& currentVertex,
-    std::vector<PolygonVertex>& outVertices,
-    std::vector<unsigned int>& outIndices,
-    const float extrude,
-    const glm::vec3& miter,
-    const glm::vec3& n1,
-    const glm::vec3& lastNormal,
-    const glm::vec3& normal,
-    size_t vertexDataOffset,
-    bool cw)
-{
-    glm::vec3 p1, p2, p3;
-
-    if (cw) {
-        p1 = currentVertex + miter * extrude;
-        p2 = currentVertex - n1 * extrude;
-        p3 = currentVertex - lastNormal * extrude;
-    } else {
-        p1 = currentVertex - miter * extrude;
-        p2 = currentVertex + lastNormal * extrude;
-        p3 = currentVertex + n1 * extrude;
-    }
-
-    if (triangleArea(p1, p2, p3) > std::numeric_limits<float>::epsilon()) {
-        outVertices.push_back({p1, normal});
-        outVertices.push_back({p2, normal});
-        outVertices.push_back({p3, normal});
-
-        addPolylineMitterIndices(outIndices, vertexDataOffset);
-
-        return 3;
-    }
-
-    return 0;
-}
-
-void buildPolyline(Line& line,
-    std::vector<PolygonVertex>& outVertices,
-    std::vector<unsigned int>& outIndices,
-    float inverseTileScale,
-    const std::unique_ptr<HeightData>& elevation,
-    float subdivision,
-    float roadsHeight,
-    float roadsExtrusionWidth)
-{
-    std::vector<PolygonVertex> vertices;
-    std::vector<unsigned int> indices;
-
-    const static glm::vec3 normal = glm::vec3(0.0, 0.0, 1.0);
-
-    // subdivideLine(line, subdivision);
-
-    float extrude = roadsExtrusionWidth * inverseTileScale;
-
-    glm::vec3 currentVertex(line[0]);
-    glm::vec3 nextVertex(line[1]);
-
-    int i = 1;
-    while (currentVertex == nextVertex) {
-        currentVertex = line[i];
-        nextVertex = line[i+1];
-        if (i++ >= line.size() - 1) {
-            return;
-        }
-    }
-
-    glm::vec3 n0 = perp(currentVertex, nextVertex);
-
-    size_t vertexDataOffset = outVertices.size();
-    const size_t offset = outVertices.size();
-
-    vertices.push_back({currentVertex + n0 * extrude, normal});
-    vertices.push_back({currentVertex - n0 * extrude, normal});
-
-    glm::vec3 lastVertex;
-    glm::vec3 lastNormal;
-
-    for (; i < line.size() - 1; ++i) {
-        lastVertex = currentVertex;
-        lastNormal = n0;
-
-        currentVertex = line[i];
-        nextVertex = line[i+1];
-
-        if (currentVertex == nextVertex) {
-            continue;
-        }
-
-        n0 = perp(lastVertex, currentVertex);
-        glm::vec3 n1 = perp(currentVertex, nextVertex);
-
-        bool cw = glm::cross(n1, n0).z > 0.0;
-
-        glm::vec3 miter = n0 + n1;
-
-        float scale = 1.f;
-        float miterLength2 = glm::dot(miter, miter);
-
-        if (miterLength2 < std::numeric_limits<float>::epsilon()) {
-            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
-        } else {
-            scale = sqrtf(2.0f / (1.0f + glm::dot(n0, n1)) / miterLength2);
-        }
-
-        miter *= scale;
-
-        if (cw) {
-            vertices.push_back({currentVertex + miter * extrude, normal});
-            vertices.push_back({currentVertex - lastNormal * extrude, normal});
-
-            addPolylineIndices(indices, vertexDataOffset);
-
-            vertexDataOffset += 4;
-
-            if (std::abs(glm::dot(n0, n1)) < 1.0 - EPSILON) {
-                vertexDataOffset += addTriangleJoint(currentVertex, vertices, indices, extrude,
-                    miter, n1, lastNormal, normal, vertexDataOffset, true);
-            }
-
-            vertices.push_back({currentVertex + miter * extrude, normal});
-            vertices.push_back({currentVertex - n1 * extrude, normal});
-        } else {
-            vertices.push_back({currentVertex + lastNormal * extrude, normal});
-            vertices.push_back({currentVertex - miter * extrude, normal});
-
-            addPolylineIndices(indices, vertexDataOffset);
-
-            vertexDataOffset += 4;
-
-            if (std::abs(glm::dot(n0, n1)) < 1.0 - EPSILON) {
-                vertexDataOffset += addTriangleJoint(currentVertex, vertices, indices, extrude,
-                    miter, n1, lastNormal, normal, vertexDataOffset, false);
-            }
-
-            vertices.push_back({currentVertex + n1 * extrude, normal});
-            vertices.push_back({currentVertex - miter * extrude, normal});
-        }
-    }
-
-    lastVertex = currentVertex;
-    currentVertex = nextVertex;
-
-    if (currentVertex != lastVertex) {
-        n0 = perp(lastVertex, currentVertex);
-
-        vertices.push_back({currentVertex + n0 * extrude, normal});
-        vertices.push_back({currentVertex - n0 * extrude, normal});
-
-        addPolylineIndices(indices, vertexDataOffset);
-    } else {
-        vertices.pop_back();
-        vertices.pop_back();
-    }
-
-    if (vertices.size() == 0) {
-        return;
-    }
-
-#if 0
-    for (const auto& v : vertices) {
-        assert(!std::isnan(v.position.x) && !std::isnan(v.position.y));
-    }
-#endif
-
-    outVertices.insert(outVertices.end(), vertices.begin(), vertices.end());
-    outIndices.insert(outIndices.end(), indices.begin(), indices.end());
-
-    for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
-        it->position.z = roadsHeight * inverseTileScale;
-    }
-
-    if (elevation) {
-        for (auto it = outVertices.begin() + offset; it != outVertices.end(); ++it) {
-            it->position.z += sampleElevation(glm::vec2(it->position.x, it->position.y),
-                elevation) * inverseTileScale;
         }
     }
 }
@@ -722,30 +517,6 @@ bool saveOBJ(std::string outputOBJ,
     bool append,
     bool normals)
 {
-    /// Cleanup mesh from degenerate points
-    {
-        for (auto& mesh : meshes) {
-            if (mesh->indices.size() == 0) continue;
-
-            int i = 0;
-            for (auto it = mesh->indices.begin(); it < mesh->indices.end() - 2;) {
-                glm::vec3 p0 = mesh->vertices[mesh->indices[i+0]].position;
-                glm::vec3 p1 = mesh->vertices[mesh->indices[i+1]].position;
-                glm::vec3 p2 = mesh->vertices[mesh->indices[i+2]].position;
-
-                if (p0 == p1 || p0 == p2) {
-                    for (int j = 0; j < 3; ++j) {
-                        it = mesh->indices.erase(it);
-                    }
-                } else {
-                    it += 3;
-                }
-
-                i += 3;
-            }
-        }
-    }
-
     size_t maxindex = 0;
 
     /// Find max index from previously existing wavefront vertices
@@ -1094,11 +865,124 @@ int vectiler(Params exportParams) {
 
                         if (layer.name == "roads" && exportParams.roads) {
                             for (Line& line : feature.lines) {
-                                buildPolyline(line, mesh->vertices, mesh->indices, tile.invScale,
-                                    textureData, exportParams.terrainSubdivision,
-                                    exportParams.roadsHeight, exportParams.roadsExtrusionWidth);
-                            }
+                                //subdivideLine(line, exportParams.terrainSubdivision);
+                                Polygon p;
+                                float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
+                                p.emplace_back();
+                                
+                                if (line.size() == 2) {
+                                    glm::vec3 currentVertex = line[0];
+                                    glm::vec3 nextVertex = line[1];
+                                    glm::vec3 n0 = perp(nextVertex - currentVertex);
+                                    
+                                    p.back().push_back(currentVertex - n0 * extrude);
+                                    p.back().push_back(currentVertex + n0 * extrude);
+                                    p.back().push_back(nextVertex + n0 * extrude);
+                                    p.back().push_back(nextVertex - n0 * extrude);
+                                } else {
+                                    glm::vec3 lastVertex = line[0];
+                                    for (int i = 1; i < line.size() - 1; ++i) {
+                                        glm::vec3 currentVertex = line[i];
+                                        glm::vec3 nextVertex = line[i+1];
+                                        
+                                        glm::vec3 n0 = perp(currentVertex - lastVertex);
+                                        glm::vec3 n1 = perp(nextVertex - currentVertex);
+                                        glm::vec3 d0 = glm::normalize(lastVertex - currentVertex);
+                                        glm::vec3 d1 = glm::normalize(nextVertex - currentVertex);
+                                        bool right = glm::cross(n1, n0).z > 0.0;
+                                        glm::vec3 miter = glm::normalize(n0 + n1);
+                                        
+                                        float miterl2 = glm::dot(miter, miter);
+                                        
+                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
+                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
+                                        } else {
+                                            float theta;
+                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
+                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
+                                            if (theta < 0.f) { theta += 2 * M_PI; }
+                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
+                                        }
+                                        
+                                        if (i == 1) {
+                                            p.back().push_back(lastVertex + n0 * extrude);
+                                            p.back().push_back(lastVertex - n0 * extrude);
+                                        }
+                                        
+                                        if (right) {
+                                            p.back().push_back(currentVertex - miter * extrude);
+                                        } else {
+                                            p.back().push_back(currentVertex - n0 * extrude);
+                                            p.back().push_back(currentVertex - n1 * extrude);
+                                        }
+                                        
+                                        lastVertex = currentVertex;
+                                    }
+                                    
+                                    lastVertex = line[line.size() - 1];
+                                    for (int i = line.size() - 2; i > 0; --i) {
+                                        glm::vec3 currentVertex = line[i];
+                                        glm::vec3 nextVertex = line[i-1];
+                                        
+                                        glm::vec3 n0 = perp(currentVertex - lastVertex);
+                                        glm::vec3 n1 = perp(nextVertex - currentVertex);
+                                        glm::vec3 d0 = glm::normalize(lastVertex - currentVertex);
+                                        glm::vec3 d1 = glm::normalize(nextVertex - currentVertex);
+                                        bool right = glm::cross(n1, n0).z > 0.0;
+                                        glm::vec3 miter = glm::normalize(n0 + n1);
+                                        
+                                        float miterl2 = glm::dot(miter, miter);
+                                        
+                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
+                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
+                                        } else {
+                                            float theta;
+                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
+                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
+                                            if (theta < 0.f) { theta += 2 * M_PI; }
+                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
+                                        }
+                                        
+                                        if (i == line.size() - 2) {
+                                            p.back().push_back(lastVertex + n0 * extrude);
+                                            p.back().push_back(lastVertex - n0 * extrude);
+                                        }
+                                        
+                                        if (right) {
+                                            p.back().push_back(currentVertex - miter * extrude);
+                                        } else {
+                                            p.back().push_back(currentVertex - n0 * extrude);
+                                            p.back().push_back(currentVertex - n1 * extrude);
+                                        }
+                                        
+                                        lastVertex = currentVertex;
+                                    }
+                                }
 
+                                if (p.back().size() <= 1) { continue; }
+
+                                // Close the polygon
+                                p.back().push_back(p.back()[0]);
+                                
+                                for (auto point : p.back()) {
+                                    std::cout << point.x << " " << point.y << std::endl;
+                                }
+
+                                size_t offset = mesh->vertices.size();
+                                buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
+                                        mesh->vertices, mesh->indices, nullptr, tile.invScale);
+
+                                buildPolygon(p, exportParams.roadsHeight * tile.invScale, mesh->vertices, mesh->indices,
+                                    nullptr, 0.f, tile.invScale);
+
+                                if (textureData) {
+                                    for (auto it = mesh->vertices.begin() + offset; it != mesh->vertices.end(); ++it) {
+                                        it->position.z += sampleElevation(glm::vec2(it->position.x, it->position.y),
+                                            textureData) * tile.invScale;
+                                    }
+                                }
+                            }
+                            
                             if (exportParams.normals && exportParams.terrain) {
                                 computeNormals(*mesh);
                             }
