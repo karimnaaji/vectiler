@@ -949,11 +949,14 @@ int vectiler(Params exportParams) {
                                 p.back().push_back(p.back()[0]);
                                 
                                 size_t offset = mesh->vertices.size();
-                                buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
-                                        mesh->vertices, mesh->indices, nullptr, tile.invScale);
 
-                                buildPolygon(p, exportParams.roadsHeight * tile.invScale, mesh->vertices, mesh->indices,
-                                    nullptr, 0.f, tile.invScale);
+                                if (exportParams.roadsHeight > 0) {
+                                    buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
+                                        mesh->vertices, mesh->indices, nullptr, tile.invScale);
+                                }
+
+                                buildPolygon(p, exportParams.roadsHeight * tile.invScale, mesh->vertices,
+                                    mesh->indices, nullptr, 0.f, tile.invScale);
 
                                 if (textureData) {
                                     for (auto it = mesh->vertices.begin() + offset; it != mesh->vertices.end(); ++it) {
