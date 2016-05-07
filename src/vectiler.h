@@ -1,4 +1,5 @@
-#pragma once
+#ifndef VECTILER_H
+#define VECTILER_H
 
 struct Params {
     const char* filename;
@@ -17,6 +18,10 @@ struct Params {
     float terrainExtrusionScale;
     bool buildings;
     float buildingsExtrusionScale;
+    bool roads;
+    float roadsHeight;
+    float roadsExtrusionWidth;
+    bool normals;
 };
 
 #ifdef __cplusplus
@@ -27,4 +32,10 @@ int vectiler(struct Params parameters);
 
 #ifdef __cplusplus
 }
+#endif
+
+#ifdef VECTILER_UNIT_TESTS
+#include "tiledata.h"
+#endif
+
 #endif

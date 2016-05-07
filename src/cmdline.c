@@ -19,6 +19,10 @@ int main(int argc, const char **argv) {
     float terrainExtrusionScale = 1.f;
     int buildings = 1;
     float buildingsExtrusionScale = 1.f;
+    int roads = 0;
+    float roadsHeight = 1.f;
+    float roadsExtrusionWidth = 5.f;
+    int normals = 0;
     const char* name = NULL;
     const char* apiKey = "vector-tiles-qVaBcRA";
 
@@ -41,11 +45,21 @@ int main(int argc, const char **argv) {
     flag_int(&aoBaking, "aoBaking", "Generate ambiant occlusion baked atlas");
     flag_int(&aoAtlasSize, "aoAtlasSize", "Controls resolution of atlas");
     flag_int(&aoSamples, "aoSamples", "Number of samples for ambient occlusion");
+    flag_int(&roads, "roads", "Whether to export roads geometry");
+    flag_float(&roadsHeight, "roadsHeight", "The roads height offset (z-axis)");
+    flag_float(&roadsExtrusionWidth, "roadsExtrusionWidth", "The roads extrusion width");
+    flag_int(&normals, "normals", "Export with normals");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
-        terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale};
+        terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
+        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals};
+
+    if (parameters.aoBaking && (parameters.terrain || parameters.roads)) {
+        printf("Ambient occlusion baking not yet available when exporting with option --terrain or --roads\n");
+        return EXIT_FAILURE;
+    }
 
     return vectiler(parameters);
 }

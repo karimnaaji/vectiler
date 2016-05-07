@@ -40,8 +40,8 @@ add_library(aobaker
     ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/raytrace.cpp
     ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/aobaker.cpp)
 
-file(GLOB_RECURSE CPP_SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
-file(GLOB_RECURSE C_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
+file(GLOB_RECURSE C_SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
+file(GLOB_RECURSE VECTILER_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
 
 set(INCLUDE_DIRS "")
@@ -67,5 +67,15 @@ set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/earcut.hpp/inclu
 
 include_directories(${INCLUDE_DIRS})
 
-add_executable(vectiler ${CPP_SOURCES} ${C_SOURCES})
-target_link_libraries(vectiler ${LIBS} aobaker thekla_atlas embree tbb)
+add_library(vectiler ${VECTILER_SOURCES})
+
+add_executable(vectiler.out ${C_SOURCES})
+
+set(VECTILER_LIBS aobaker thekla_atlas embree tbb ${LIBS})
+
+target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
+
+if (BUILD_TESTS)
+    message(STATUS "Build unit tests")
+    add_subdirectory(${PROJECT_SOURCE_DIR}/tests)
+endif()

@@ -7,7 +7,7 @@ A wavefront obj vector tile builder and exporter based on [mapzen](https://mapze
 - build and export mesh in obj files based on tile coordinates (find your tiles of interest [here](http://www.maptiler.org/google-maps-coordinates-tile-bounds-projection/))
 - bake ambiant occlusion and save it in an atlas (using [aobaker](https://github.com/prideout/aobaker))
 
-![](http://karim.naaji.fr/images/manhattan-ao.png)
+![](img/vectiler.png)
 
 **export example**
 
@@ -41,7 +41,7 @@ $ cmake --build build
 **usage**
 
 ```
-  Usage: ./vectiler [options]
+  Usage: ./vectiler.out [options]
 
   Options:
     --name                     File name ((null))
@@ -61,6 +61,10 @@ $ cmake --build build
     --aoBaking                 Generate ambiant occlusion baked atlas (0)
     --aoAtlasSize              Controls resolution of atlas (512)
     --aoSamples                Number of samples for ambient occlusion (256)
+    --roads                    Whether to export roads geometry (0)
+    --roadsHeight              The roads height offset (z-axis) (1.0)
+    --roadsExtrusionWidth      The roads extrusion width (5.0)
+    --normals                  Export with normals (1)
     --version                  Output version
     --help                     Output help
 ```
@@ -81,7 +85,7 @@ Download one tile with ambiant occlusion baked in a texture:
 $ ./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
 ```
 
-![](img/vectiler.png)
+![](img/ao.png)
 
 Output files are:
 - `[tilex].[tiley].[tilez].obj`: a simple mesh containing coordinates and normals

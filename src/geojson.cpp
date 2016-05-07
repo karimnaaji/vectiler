@@ -1,16 +1,26 @@
 #include "geojson.h"
 #include "glm/glm.hpp"
 
-void GeoJson::extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile) {
+bool GeoJson::extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile, Point* last) {
     glm::vec2 pos = lonLatToMeters(glm::dvec2(_in[0].GetDouble(), _in[1].GetDouble()));
     _out.x = (pos.x - _tile.tileOrigin.x) * _tile.invScale;
     _out.y = (pos.y - _tile.tileOrigin.y) * _tile.invScale;
+    if (last && glm::length(_out - *last) < 1e-5f) {
+        return false;
+    }
+    return true;
 }
 
 void GeoJson::extractLine(const rapidjson::Value& _in, Line& _out, const Tile& _tile) {
     for (auto itr = _in.Begin(); itr != _in.End(); ++itr) {
         _out.emplace_back();
-        extractPoint(*itr, _out.back(), _tile);
+        if (_out.size() > 1) {
+            if (!extractPoint(*itr, _out.back(), _tile, &_out[_out.size() - 2])) {
+                _out.pop_back();
+            }
+        } else {
+            extractPoint(*itr, _out.back(), _tile);
+        }
     }
 }
 
@@ -53,11 +63,11 @@ void GeoJson::extractFeature(const rapidjson::Value& _in, Feature& _out, const T
     if (geometryType == "Point") {
         _out.geometryType = GeometryType::points;
         _out.points.emplace_back();
-        extractPoint(coords, _out.points.back(), _tile);
+        if (!extractPoint(coords, _out.points.back(), _tile)) { _out.points.pop_back(); }
     } else if (geometryType == "MultiPoint") {
         _out.geometryType= GeometryType::points;
         for (auto pointCoords = coords.Begin(); pointCoords != coords.End(); ++pointCoords) {
-            extractPoint(*pointCoords, _out.points.back(), _tile);
+            if (!extractPoint(coords, _out.points.back(), _tile)) { _out.points.pop_back(); }
         }
     } else if (geometryType == "LineString") {
         _out.geometryType = GeometryType::lines;

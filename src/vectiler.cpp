@@ -16,6 +16,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#define EPSILON 1e-5f
+
 struct PolygonVertex {
     glm::vec3 position;
     glm::vec3 normal;
@@ -33,7 +35,7 @@ struct PolygonMesh {
     glm::vec2 offset;
 };
 
-static size_t write_data(void* ptr, size_t size, size_t nmemb, void *stream) {
+static size_t writeData(void* ptr, size_t size, size_t nmemb, void *stream) {
     ((std::stringstream*) stream)->write(reinterpret_cast<char*>(ptr), size * nmemb);
     return size * nmemb;
 }
@@ -48,7 +50,7 @@ bool downloadData(std::stringstream& out, const std::string& url) {
         curlInitialized = true;
 
         // set up curl to perform fetch
-        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, write_data);
+        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeData);
         curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
         curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
         curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
@@ -59,7 +61,7 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
     curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
 
-    printf("URL request: %s ", url.c_str());
+    printf("URL request: %s", url.c_str());
 
     CURLcode result = curl_easy_perform(curlHandle);
 
@@ -70,6 +72,28 @@ bool downloadData(std::stringstream& out, const std::string& url) {
     }
 
     return result == CURLE_OK;
+}
+
+void computeNormals(PolygonMesh& mesh) {
+    for (size_t i = 0; i < mesh.indices.size(); i += 3) {
+        int i1 = mesh.indices[i+0];
+        int i2 = mesh.indices[i+1];
+        int i3 = mesh.indices[i+2];
+
+        const glm::vec3& v1 = mesh.vertices[i1].position;
+        const glm::vec3& v2 = mesh.vertices[i2].position;
+        const glm::vec3& v3 = mesh.vertices[i3].position;
+
+        glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
+
+        mesh.vertices[i1].normal += d;
+        mesh.vertices[i2].normal += d;
+        mesh.vertices[i3].normal += d;
+    }
+
+    for (auto& v : mesh.vertices) {
+        v.normal = glm::normalize(v.normal);
+    }
 }
 
 std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
@@ -379,6 +403,10 @@ void buildPolygon(const Polygon& polygon,
     }
 }
 
+glm::vec3 perp(const glm::vec3& v) {
+    return glm::normalize(glm::vec3(-v.y, v.x, 0.0));
+}
+
 void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
     for (auto& tileData0 : heightData) {
         auto& tileHeight0 = tileData0.second;
@@ -411,9 +439,37 @@ void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& h
                     tileHeight1->elevation[x][0] = h;
                 }
             }
-
-            // TODO: Corner point
         }
+    }
+}
+
+void addFaces(std::ostream& file, const PolygonMesh& mesh, size_t indexOffset, bool normals) {
+    for (int i = 0; i < mesh.indices.size(); i += 3) {
+        file << "f " << mesh.indices[i] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i] + indexOffset + 1) : "");
+        file << " ";
+        file << mesh.indices[i+1] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i+1] + indexOffset + 1) : "");
+        file << " ";
+        file << mesh.indices[i+2] + indexOffset + 1
+             << (normals ? "//" + std::to_string(mesh.indices[i+2] + indexOffset + 1) : "");
+        file << "\n";
+    }
+}
+
+void addNormals(std::ostream& file, const PolygonMesh& mesh) {
+    for (auto vertex : mesh.vertices) {
+        file << "vn " << vertex.normal.x << " "
+             << vertex.normal.y << " "
+             << vertex.normal.z << "\n";
+    }
+}
+
+void addPositions(std::ostream& file, const PolygonMesh& mesh, float offsetx, float offsety) {
+    for (auto vertex : mesh.vertices) {
+        file << "v " << vertex.position.x + offsetx + mesh.offset.x << " "
+             << vertex.position.y + offsety + mesh.offset.y << " "
+             << vertex.position.z << "\n";
     }
 }
 
@@ -431,32 +487,9 @@ bool saveOBJ(std::string outputOBJ,
     std::vector<std::unique_ptr<PolygonMesh>>& meshes,
     float offsetx,
     float offsety,
-    bool append)
+    bool append,
+    bool normals)
 {
-    /// Cleanup mesh from degenerate points
-    {
-        for (auto& mesh : meshes) {
-            if (mesh->indices.size() == 0) continue;
-
-            int i = 0;
-            for (auto it = mesh->indices.begin(); it < mesh->indices.end() - 2;) {
-                glm::vec3 p0 = mesh->vertices[mesh->indices[i+0]].position;
-                glm::vec3 p1 = mesh->vertices[mesh->indices[i+1]].position;
-                glm::vec3 p2 = mesh->vertices[mesh->indices[i+2]].position;
-
-                if (p0 == p1 || p0 == p2) {
-                    for (int j = 0; j < 3; ++j) {
-                        it = mesh->indices.erase(it);
-                    }
-                } else {
-                    it += 3;
-                }
-
-                i += 3;
-            }
-        }
-    }
-
     size_t maxindex = 0;
 
     /// Find max index from previously existing wavefront vertices
@@ -505,6 +538,9 @@ bool saveOBJ(std::string outputOBJ,
         }
 
         if (file.is_open()) {
+            size_t nVertex = 0;
+            size_t nTriangles = 0;
+
             file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
             file << "\n";
 
@@ -518,30 +554,18 @@ bool saveOBJ(std::string outputOBJ,
 
                     file << "o mesh" << meshCnt++ << "\n";
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
-                             << vertex.position.y + offsety + mesh->offset.y << " "
-                             << vertex.position.z << "\n";
+                    addPositions(file, *mesh, offsetx, offsety);
+                    nVertex += mesh->vertices.size();
+
+                    if (normals) {
+                        addNormals(file, *mesh);
                     }
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "vn " << vertex.normal.x << " "
-                             << vertex.normal.y << " "
-                             << vertex.normal.z << "\n";
-                    }
-
-                    for (int i = 0; i < mesh->indices.size(); i += 3) {
-                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
-                             << mesh->indices[i] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
-                             << mesh->indices[i+1] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
-                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
-                    }
+                    addFaces(file, *mesh, indexOffset, normals);
+                    nTriangles += mesh->indices.size() / 3;
 
                     file << "\n";
+
                     indexOffset += mesh->vertices.size();
                 }
             } else {
@@ -549,44 +573,41 @@ bool saveOBJ(std::string outputOBJ,
 
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
+                    addPositions(file, *mesh, offsetx, offsety);
+                    nVertex += mesh->vertices.size();
+                }
 
-                    for (auto vertex : mesh->vertices) {
-                        file << "v " << vertex.position.x + offsetx + mesh->offset.x << " "
-                             << vertex.position.y + offsety + mesh->offset.y << " "
-                             << vertex.position.z << "\n";
+                if (normals) {
+                    for (const auto& mesh : meshes) {
+                        if (mesh->vertices.size() == 0) { continue; }
+                        addNormals(file, *mesh);
                     }
                 }
 
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
-
-                    for (auto vertex : mesh->vertices) {
-                        file << "vn " << vertex.normal.x << " "
-                             << vertex.normal.y << " "
-                             << vertex.normal.z << "\n";
-                    }
-                }
-
-                for (const auto& mesh : meshes) {
-                    if (mesh->vertices.size() == 0) { continue; }
-
-                    for (int i = 0; i < mesh->indices.size(); i += 3) {
-                        file << "f " << mesh->indices[i] + indexOffset + 1 << "//"
-                             << mesh->indices[i] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+1] + indexOffset + 1 << "//"
-                             << mesh->indices[i+1] + indexOffset + 1;
-                        file << " ";
-                        file << mesh->indices[i+2] + indexOffset + 1 << "//"
-                             << mesh->indices[i+2] + indexOffset + 1 << "\n";
-                    }
-
+                    addFaces(file, *mesh, indexOffset, normals);
                     indexOffset += mesh->vertices.size();
+                    nTriangles += mesh->indices.size() / 3;
                 }
             }
 
             file.close();
-            printf("Saved obj file %s\n", outputOBJ.c_str());
+
+            // Print infos
+            {
+                printf("Saved obj file: %s\n", outputOBJ.c_str());
+                printf("Triangles: %ld\n", nTriangles);
+                printf("Vertices: %ld\n", nVertex);
+
+                std::ifstream in(outputOBJ, std::ifstream::ate | std::ifstream::binary);
+                if (in.is_open()) {
+                    int size = (int)in.tellg();
+                    printf("File size: %fmb\n", float(size) / (1024 * 1024));
+                    in.close();
+                }
+            }
+
             return true;
         } else {
             printf("Can't open file %s\n", outputOBJ.c_str());
@@ -698,7 +719,7 @@ int vectiler(Params exportParams) {
                 heightData[tile] = std::move(textureData);
             }
 
-            if (exportParams.buildings) {
+            if (exportParams.buildings || exportParams.roads) {
                std::string url = vectorTileURL(tile, apiKey);
 
                 auto tileData = downloadTile(url, tile);
@@ -762,26 +783,8 @@ int vectiler(Params exportParams) {
                 }
 
                 /// Compute faces normals
-                {
-                    for (size_t i = 0; i < mesh->indices.size(); i += 3) {
-                        int i1 = mesh->indices[i+0];
-                        int i2 = mesh->indices[i+1];
-                        int i3 = mesh->indices[i+2];
-
-                        const glm::vec3& v1 = mesh->vertices[i1].position;
-                        const glm::vec3& v2 = mesh->vertices[i2].position;
-                        const glm::vec3& v3 = mesh->vertices[i3].position;
-
-                        glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
-
-                        mesh->vertices[i1].normal += d;
-                        mesh->vertices[i2].normal += d;
-                        mesh->vertices[i3].normal += d;
-                    }
-
-                    for (auto& v : mesh->vertices) {
-                        v.normal = glm::normalize(v.normal);
-                    }
+                if (exportParams.normals) {
+                    computeNormals(*mesh);
                 }
 
                 mesh->offset = offset;
@@ -790,7 +793,7 @@ int vectiler(Params exportParams) {
         }
 
         /// Build vector tile mesh
-        if (exportParams.buildings) {
+        if (exportParams.buildings || exportParams.roads) {
             const auto& data = vectorTileData[tile];
 
             if (data) {
@@ -799,11 +802,7 @@ int vectiler(Params exportParams) {
 
                 for (auto layer : data->layers) {
                     for (auto feature : layer.features) {
-                        // Coupled with terrain data, only export layer buildings for now
-                        if (textureData && layer.name != "buildings") {
-                            continue;
-                        }
-
+                        if (textureData && layer.name != "buildings" && layer.name != "roads") { continue; }
                         auto itHeight = feature.props.numericProps.find(keyHeight);
                         auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
                         float scale = tile.invScale * exportParams.buildingsExtrusionScale;
@@ -814,7 +813,7 @@ int vectiler(Params exportParams) {
                             height = itHeight->second * scale;
                         }
 
-                        if (textureData && height == 0.0) {
+                        if (textureData && layer.name != "roads" && height == 0.0) {
                             continue;
                         }
 
@@ -823,15 +822,153 @@ int vectiler(Params exportParams) {
                         }
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
-                        for (auto polygon : feature.polygons) {
-                            float centroidHeight = 0.f;
-                            if (minHeight != height) {
-                                centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
-                                    mesh->vertices, mesh->indices, textureData, tile.invScale);
+
+                        if (exportParams.buildings) {
+                            for (const Polygon& polygon : feature.polygons) {
+                                float centroidHeight = 0.f;
+                                if (minHeight != height) {
+                                    centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
+                                        mesh->vertices, mesh->indices, textureData, tile.invScale);
+                                }
+
+                                buildPolygon(polygon, height, mesh->vertices, mesh->indices,
+                                    textureData, centroidHeight, tile.invScale);
+                            }
+                        }
+
+                        if (exportParams.roads) {
+                            for (Line& line : feature.lines) {
+                                Polygon p;
+                                float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
+                                p.emplace_back();
+
+                                if (line.size() == 2) {
+                                    glm::vec3 curr = line[0];
+                                    glm::vec3 next = line[1];
+                                    glm::vec3 n0 = perp(next - curr);
+
+                                    p.back().push_back(curr - n0 * extrude);
+                                    p.back().push_back(curr + n0 * extrude);
+                                    p.back().push_back(next + n0 * extrude);
+                                    p.back().push_back(next - n0 * extrude);
+                                } else {
+                                    glm::vec3 last = line[0];
+                                    for (int i = 1; i < line.size() - 1; ++i) {
+                                        glm::vec3 curr = line[i];
+                                        glm::vec3 next = line[i+1];
+                                        glm::vec3 n0 = perp(curr - last);
+                                        glm::vec3 n1 = perp(next - curr);
+                                        glm::vec3 d0 = glm::normalize(last - curr);
+                                        glm::vec3 d1 = glm::normalize(next - curr);
+                                        bool right = glm::cross(n1, n0).z > 0.0;
+                                        glm::vec3 miter = glm::normalize(n0 + n1);
+                                        float miterl2 = glm::dot(miter, miter);
+
+                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
+                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
+                                        } else {
+                                            float theta;
+                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
+                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
+                                            if (theta < 0.f) { theta += 2 * M_PI; }
+                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
+                                        }
+
+                                        if (i == 1) {
+                                            p.back().push_back(last + n0 * extrude);
+                                            p.back().push_back(last - n0 * extrude);
+                                        }
+
+                                        if (right) {
+                                            p.back().push_back(curr - miter * extrude);
+                                        } else {
+                                            p.back().push_back(curr - n0 * extrude);
+                                            p.back().push_back(curr - n1 * extrude);
+                                        }
+
+                                        last = curr;
+                                    }
+
+                                    last = line[line.size() - 1];
+                                    for (int i = line.size() - 2; i > 0; --i) {
+                                        glm::vec3 curr = line[i];
+                                        glm::vec3 next = line[i-1];
+                                        glm::vec3 n0 = perp(curr - last);
+                                        glm::vec3 n1 = perp(next - curr);
+                                        glm::vec3 d0 = glm::normalize(last - curr);
+                                        glm::vec3 d1 = glm::normalize(next - curr);
+                                        bool right = glm::cross(n1, n0).z > 0.0;
+                                        glm::vec3 miter = glm::normalize(n0 + n1);
+                                        float miterl2 = glm::dot(miter, miter);
+
+                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
+                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
+                                        } else {
+                                            float theta;
+                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
+                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
+                                            if (theta < 0.f) { theta += 2 * M_PI; }
+                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
+                                        }
+
+                                        if (i == line.size() - 2) {
+                                            p.back().push_back(last + n0 * extrude);
+                                            p.back().push_back(last - n0 * extrude);
+                                        }
+
+                                        if (right) {
+                                            p.back().push_back(curr - miter * extrude);
+                                        } else {
+                                            p.back().push_back(curr - n0 * extrude);
+                                            p.back().push_back(curr - n1 * extrude);
+                                        }
+
+                                        last = curr;
+                                    }
+                                }
+
+                                if (p.back().size() < 3) { continue; }
+
+                                int count = 0;
+                                for (int i = 0; i < p.back().size(); i++) {
+                                    int j = (i + 1) % p.back().size();
+                                    int k = (i + 2) % p.back().size();
+                                    double z = (p.back()[j].x - p.back()[i].x)
+                                             * (p.back()[k].y - p.back()[j].y)
+                                             - (p.back()[j].y - p.back()[i].y)
+                                             * (p.back()[k].x - p.back()[j].x);
+                                    if (z < 0) { count--; }
+                                    else if (z > 0) { count++; }
+                                }
+
+                                if (count > 0) { // CCW
+                                    std::reverse(p.back().begin(), p.back().end());
+                                }
+
+                                // Close the polygon
+                                p.back().push_back(p.back()[0]);
+
+                                size_t offset = mesh->vertices.size();
+
+                                if (exportParams.roadsHeight > 0) {
+                                    buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
+                                        mesh->vertices, mesh->indices, nullptr, tile.invScale);
+                                }
+
+                                buildPolygon(p, exportParams.roadsHeight * tile.invScale, mesh->vertices,
+                                    mesh->indices, nullptr, 0.f, tile.invScale);
+
+                                if (textureData) {
+                                    for (auto it = mesh->vertices.begin() + offset; it != mesh->vertices.end(); ++it) {
+                                        it->position.z += sampleElevation(glm::vec2(it->position.x, it->position.y),
+                                            textureData) * tile.invScale;
+                                    }
+                                }
                             }
 
-                            buildPolygon(polygon, height, mesh->vertices, mesh->indices,
-                                textureData, centroidHeight, tile.invScale);
+                            if (exportParams.normals && exportParams.terrain) {
+                                computeNormals(*mesh);
+                            }
                         }
 
                         // Add local mesh offset
@@ -860,7 +997,8 @@ int vectiler(Params exportParams) {
         exportParams.splitMesh, meshes,
         exportParams.offset[0],
         exportParams.offset[1],
-        exportParams.append);
+        exportParams.append,
+        exportParams.normals);
 
     if (!saved) {
         return EXIT_FAILURE;
@@ -868,16 +1006,69 @@ int vectiler(Params exportParams) {
 
     // Bake ambiant occlusion using AO Baker
     if (exportParams.aoBaking) {
-        bool aoBaked = aobaker_bake(outputOBJ.c_str(),
-            (outFile + "-ao.obj").c_str(),
-            (outFile + ".png").c_str(),
-            exportParams.aoSizeHint,
-            exportParams.aoSamples,
+        std::string aoFile = outFile + "-ao.obj";
+        std::string aoImageFile = outFile + ".png";
+        std::string aoMaterialFile = outFile + ".mtl";
+
+        bool aoBaked = aobaker_bake(outputOBJ.c_str(), aoFile.c_str(), aoImageFile.c_str(),
+            exportParams.aoSizeHint, exportParams.aoSamples,
             false,  // g-buffers
             false,  // charinfo
             1.0);   // multiply
 
-        return aoBaked;
+        bool success = aoBaked;
+        std::string aoFileData;
+
+        {
+            std::ifstream ifile(aoFile);
+            success &= ifile.is_open();
+
+            if (success) {
+                aoFileData = std::string((std::istreambuf_iterator<char>(ifile)),
+                        (std::istreambuf_iterator<char>()));
+                ifile.close();
+            }
+        }
+
+        // Inject material to wavefront
+        {
+            std::ofstream ofile = std::ofstream(aoFile);
+            success &= ofile.is_open();
+
+            if (success) {
+                std::string materialHeader;
+                materialHeader += "mtllib " + aoMaterialFile + "\n";
+                materialHeader += "usemtl tile_mtl\n\n";
+                ofile << materialHeader;
+                ofile << aoFileData;
+                ofile.close();
+            }
+        }
+
+
+        // Export material properties
+        {
+            std::ofstream materialfile = std::ofstream(aoMaterialFile);
+            success &= materialfile.is_open();
+
+            if (success) {
+                printf("Saving material file %s\n", aoMaterialFile.c_str());
+                std::string material = R"END(
+                    newmtl tile_mtl
+                    Ka 0.0000 0.0000 0.0000
+                    Kd 1.0000 1.0000 1.0000
+                    Ks 0.0000 0.0000 0.0000
+                    d 1.0
+                    map_Kd )END";
+                material += aoImageFile;
+                materialfile << material;
+                materialfile.close();
+            }
+        }
+
+        if (!success) {
+            return EXIT_FAILURE;
+        }
     }
 
     return EXIT_SUCCESS;
