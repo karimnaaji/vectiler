@@ -56,5 +56,10 @@ int main(int argc, const char **argv) {
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
         (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals};
 
+    if (parameters.aoBaking && (parameters.terrain || parameters.roads)) {
+        printf("Ambient occlusion baking not yet available when exporting with option --terrain or --roads\n");
+        return EXIT_FAILURE;
+    }
+
     return vectiler(parameters);
 }
