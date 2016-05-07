@@ -836,35 +836,32 @@ int vectiler(Params exportParams) {
                             }
                         }
 
-                        if (layer.name == "roads" && exportParams.roads) {
+                        if (exportParams.roads) {
                             for (Line& line : feature.lines) {
-                                //subdivideLine(line, exportParams.terrainSubdivision);
                                 Polygon p;
                                 float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
                                 p.emplace_back();
                                 
                                 if (line.size() == 2) {
-                                    glm::vec3 currentVertex = line[0];
-                                    glm::vec3 nextVertex = line[1];
-                                    glm::vec3 n0 = perp(nextVertex - currentVertex);
+                                    glm::vec3 curr = line[0];
+                                    glm::vec3 next = line[1];
+                                    glm::vec3 n0 = perp(next - curr);
                                     
-                                    p.back().push_back(currentVertex - n0 * extrude);
-                                    p.back().push_back(currentVertex + n0 * extrude);
-                                    p.back().push_back(nextVertex + n0 * extrude);
-                                    p.back().push_back(nextVertex - n0 * extrude);
+                                    p.back().push_back(curr - n0 * extrude);
+                                    p.back().push_back(curr + n0 * extrude);
+                                    p.back().push_back(next + n0 * extrude);
+                                    p.back().push_back(next - n0 * extrude);
                                 } else {
-                                    glm::vec3 lastVertex = line[0];
+                                    glm::vec3 last = line[0];
                                     for (int i = 1; i < line.size() - 1; ++i) {
-                                        glm::vec3 currentVertex = line[i];
-                                        glm::vec3 nextVertex = line[i+1];
-                                        
-                                        glm::vec3 n0 = perp(currentVertex - lastVertex);
-                                        glm::vec3 n1 = perp(nextVertex - currentVertex);
-                                        glm::vec3 d0 = glm::normalize(lastVertex - currentVertex);
-                                        glm::vec3 d1 = glm::normalize(nextVertex - currentVertex);
+                                        glm::vec3 curr = line[i];
+                                        glm::vec3 next = line[i+1];
+                                        glm::vec3 n0 = perp(curr - last);
+                                        glm::vec3 n1 = perp(next - curr);
+                                        glm::vec3 d0 = glm::normalize(last - curr);
+                                        glm::vec3 d1 = glm::normalize(next - curr);
                                         bool right = glm::cross(n1, n0).z > 0.0;
                                         glm::vec3 miter = glm::normalize(n0 + n1);
-                                        
                                         float miterl2 = glm::dot(miter, miter);
                                         
                                         if (miterl2 < std::numeric_limits<float>::epsilon()) {
@@ -878,32 +875,30 @@ int vectiler(Params exportParams) {
                                         }
                                         
                                         if (i == 1) {
-                                            p.back().push_back(lastVertex + n0 * extrude);
-                                            p.back().push_back(lastVertex - n0 * extrude);
+                                            p.back().push_back(last + n0 * extrude);
+                                            p.back().push_back(last - n0 * extrude);
                                         }
                                         
                                         if (right) {
-                                            p.back().push_back(currentVertex - miter * extrude);
+                                            p.back().push_back(curr - miter * extrude);
                                         } else {
-                                            p.back().push_back(currentVertex - n0 * extrude);
-                                            p.back().push_back(currentVertex - n1 * extrude);
+                                            p.back().push_back(curr - n0 * extrude);
+                                            p.back().push_back(curr - n1 * extrude);
                                         }
                                         
-                                        lastVertex = currentVertex;
+                                        last = curr;
                                     }
                                     
-                                    lastVertex = line[line.size() - 1];
+                                    last = line[line.size() - 1];
                                     for (int i = line.size() - 2; i > 0; --i) {
-                                        glm::vec3 currentVertex = line[i];
-                                        glm::vec3 nextVertex = line[i-1];
-                                        
-                                        glm::vec3 n0 = perp(currentVertex - lastVertex);
-                                        glm::vec3 n1 = perp(nextVertex - currentVertex);
-                                        glm::vec3 d0 = glm::normalize(lastVertex - currentVertex);
-                                        glm::vec3 d1 = glm::normalize(nextVertex - currentVertex);
+                                        glm::vec3 curr = line[i];
+                                        glm::vec3 next = line[i-1];
+                                        glm::vec3 n0 = perp(curr - last);
+                                        glm::vec3 n1 = perp(next - curr);
+                                        glm::vec3 d0 = glm::normalize(last - curr);
+                                        glm::vec3 d1 = glm::normalize(next - curr);
                                         bool right = glm::cross(n1, n0).z > 0.0;
                                         glm::vec3 miter = glm::normalize(n0 + n1);
-                                        
                                         float miterl2 = glm::dot(miter, miter);
                                         
                                         if (miterl2 < std::numeric_limits<float>::epsilon()) {
@@ -917,18 +912,18 @@ int vectiler(Params exportParams) {
                                         }
                                         
                                         if (i == line.size() - 2) {
-                                            p.back().push_back(lastVertex + n0 * extrude);
-                                            p.back().push_back(lastVertex - n0 * extrude);
+                                            p.back().push_back(last + n0 * extrude);
+                                            p.back().push_back(last - n0 * extrude);
                                         }
                                         
                                         if (right) {
-                                            p.back().push_back(currentVertex - miter * extrude);
+                                            p.back().push_back(curr - miter * extrude);
                                         } else {
-                                            p.back().push_back(currentVertex - n0 * extrude);
-                                            p.back().push_back(currentVertex - n1 * extrude);
+                                            p.back().push_back(curr - n0 * extrude);
+                                            p.back().push_back(curr - n1 * extrude);
                                         }
                                         
-                                        lastVertex = currentVertex;
+                                        last = curr;
                                     }
                                 }
                                 
@@ -953,10 +948,6 @@ int vectiler(Params exportParams) {
                                 // Close the polygon
                                 p.back().push_back(p.back()[0]);
                                 
-                                for (auto point : p.back()) {
-                                    std::cout << point.x << " " << point.y << std::endl;
-                                }
-
                                 size_t offset = mesh->vertices.size();
                                 buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
                                         mesh->vertices, mesh->indices, nullptr, tile.invScale);
