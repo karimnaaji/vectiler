@@ -79,18 +79,18 @@ void computeNormals(PolygonMesh& mesh) {
         int i1 = mesh.indices[i+0];
         int i2 = mesh.indices[i+1];
         int i3 = mesh.indices[i+2];
-        
+
         const glm::vec3& v1 = mesh.vertices[i1].position;
         const glm::vec3& v2 = mesh.vertices[i2].position;
         const glm::vec3& v3 = mesh.vertices[i3].position;
-        
+
         glm::vec3 d = glm::normalize(glm::cross(v2 - v1, v3 - v1));
-        
+
         mesh.vertices[i1].normal += d;
         mesh.vertices[i2].normal += d;
         mesh.vertices[i3].normal += d;
     }
-    
+
     for (auto& v : mesh.vertices) {
         v.normal = glm::normalize(v.normal);
     }
@@ -841,12 +841,12 @@ int vectiler(Params exportParams) {
                                 Polygon p;
                                 float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
                                 p.emplace_back();
-                                
+
                                 if (line.size() == 2) {
                                     glm::vec3 curr = line[0];
                                     glm::vec3 next = line[1];
                                     glm::vec3 n0 = perp(next - curr);
-                                    
+
                                     p.back().push_back(curr - n0 * extrude);
                                     p.back().push_back(curr + n0 * extrude);
                                     p.back().push_back(next + n0 * extrude);
@@ -863,7 +863,7 @@ int vectiler(Params exportParams) {
                                         bool right = glm::cross(n1, n0).z > 0.0;
                                         glm::vec3 miter = glm::normalize(n0 + n1);
                                         float miterl2 = glm::dot(miter, miter);
-                                        
+
                                         if (miterl2 < std::numeric_limits<float>::epsilon()) {
                                             miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
                                         } else {
@@ -873,22 +873,22 @@ int vectiler(Params exportParams) {
                                             if (theta < 0.f) { theta += 2 * M_PI; }
                                             miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
                                         }
-                                        
+
                                         if (i == 1) {
                                             p.back().push_back(last + n0 * extrude);
                                             p.back().push_back(last - n0 * extrude);
                                         }
-                                        
+
                                         if (right) {
                                             p.back().push_back(curr - miter * extrude);
                                         } else {
                                             p.back().push_back(curr - n0 * extrude);
                                             p.back().push_back(curr - n1 * extrude);
                                         }
-                                        
+
                                         last = curr;
                                     }
-                                    
+
                                     last = line[line.size() - 1];
                                     for (int i = line.size() - 2; i > 0; --i) {
                                         glm::vec3 curr = line[i];
@@ -900,7 +900,7 @@ int vectiler(Params exportParams) {
                                         bool right = glm::cross(n1, n0).z > 0.0;
                                         glm::vec3 miter = glm::normalize(n0 + n1);
                                         float miterl2 = glm::dot(miter, miter);
-                                        
+
                                         if (miterl2 < std::numeric_limits<float>::epsilon()) {
                                             miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
                                         } else {
@@ -910,25 +910,25 @@ int vectiler(Params exportParams) {
                                             if (theta < 0.f) { theta += 2 * M_PI; }
                                             miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
                                         }
-                                        
+
                                         if (i == line.size() - 2) {
                                             p.back().push_back(last + n0 * extrude);
                                             p.back().push_back(last - n0 * extrude);
                                         }
-                                        
+
                                         if (right) {
                                             p.back().push_back(curr - miter * extrude);
                                         } else {
                                             p.back().push_back(curr - n0 * extrude);
                                             p.back().push_back(curr - n1 * extrude);
                                         }
-                                        
+
                                         last = curr;
                                     }
                                 }
-                                
+
                                 if (p.back().size() < 3) { continue; }
-                                
+
                                 int count = 0;
                                 for (int i = 0; i < p.back().size(); i++) {
                                     int j = (i + 1) % p.back().size();
@@ -947,7 +947,7 @@ int vectiler(Params exportParams) {
 
                                 // Close the polygon
                                 p.back().push_back(p.back()[0]);
-                                
+
                                 size_t offset = mesh->vertices.size();
 
                                 if (exportParams.roadsHeight > 0) {
@@ -965,7 +965,7 @@ int vectiler(Params exportParams) {
                                     }
                                 }
                             }
-                            
+
                             if (exportParams.normals && exportParams.terrain) {
                                 computeNormals(*mesh);
                             }

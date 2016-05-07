@@ -71,7 +71,6 @@ void GeoJson::extractFeature(const rapidjson::Value& _in, Feature& _out, const T
         }
     } else if (geometryType == "LineString") {
         _out.geometryType = GeometryType::lines;
-        if (_out.lines.size() == 0)
         _out.lines.emplace_back();
         extractLine(coords, _out.lines.back(), _tile);
     } else if (geometryType == "MultiLineString") {

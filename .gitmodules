@@ -10,6 +10,3 @@
 [submodule "3rdparty/aobaker"]
 	path = 3rdparty/aobaker
 	url = https://github.com/prideout/aobaker.git
-[submodule "renderer/oglw"]
-	path = renderer/oglw
-	url = https://github.com/karimnaaji/oglw.git
