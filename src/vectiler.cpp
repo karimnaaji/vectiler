@@ -407,33 +407,6 @@ glm::vec3 perp(const glm::vec3& v) {
     return glm::normalize(glm::vec3(-v.y, v.x, 0.0));
 }
 
-void subdivideLine(Line& line, float subdivision) {
-    float subdivisionStep = 1.0 / subdivision;
-
-    auto it = line.begin();
-
-    for (int i = 0; i < line.size() - 1; ++i) {
-        glm::vec3 p0 = line[i];
-        glm::vec3 p1 = line[i+1];
-
-        if (p0 == p1) { continue; }
-
-        glm::vec3 dir = glm::normalize(p1 - p0);
-        float distance = glm::distance(p0, p1);
-
-        if (distance > subdivisionStep) {
-            int steps = distance / subdivisionStep;
-            float step = distance / steps;
-
-            for (int s = 1; s < steps; ++s) {
-                glm::vec3 np = p0 + dir * step * (float)s;
-                it = line.insert(it + 1, np);
-                i++;
-            }
-        }
-    }
-}
-
 void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
     for (auto& tileData0 : heightData) {
         auto& tileHeight0 = tileData0.second;
@@ -958,8 +931,24 @@ int vectiler(Params exportParams) {
                                         lastVertex = currentVertex;
                                     }
                                 }
+                                
+                                if (p.back().size() < 3) { continue; }
+                                
+                                int count = 0;
+                                for (int i = 0; i < p.back().size(); i++) {
+                                    int j = (i + 1) % p.back().size();
+                                    int k = (i + 2) % p.back().size();
+                                    double z = (p.back()[j].x - p.back()[i].x)
+                                             * (p.back()[k].y - p.back()[j].y)
+                                             - (p.back()[j].y - p.back()[i].y)
+                                             * (p.back()[k].x - p.back()[j].x);
+                                    if (z < 0) { count--; }
+                                    else if (z > 0) { count++; }
+                                }
 
-                                if (p.back().size() <= 1) { continue; }
+                                if (count > 0) { // CCW
+                                    std::reverse(p.back().begin(), p.back().end());
+                                }
 
                                 // Close the polygon
                                 p.back().push_back(p.back()[0]);

@@ -36,7 +36,6 @@ int vectiler(struct Params parameters);
 
 #ifdef VECTILER_UNIT_TESTS
 #include "tiledata.h"
-void subdivideLine(Line& line, float subdivision);
 #endif
 
 #endif
