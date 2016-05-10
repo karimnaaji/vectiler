@@ -407,6 +407,54 @@ glm::vec3 perp(const glm::vec3& v) {
     return glm::normalize(glm::vec3(-v.y, v.x, 0.0));
 }
 
+glm::vec3 computeMiterVector(const glm::vec3& d0,
+    const glm::vec3& d1,
+    const glm::vec3& n0,
+    const glm::vec3& n1)
+{
+    glm::vec3 miter = glm::normalize(n0 + n1);
+    float miterl2 = glm::dot(miter, miter);
+
+    if (miterl2 < std::numeric_limits<float>::epsilon()) {
+        miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
+    } else {
+        float theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
+        if (theta < 0.f) { theta += 2 * M_PI; }
+        miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
+    }
+
+    return miter;
+}
+
+void addPolygonPolylinePoint(Line& line,
+    const glm::vec3 curr,
+    const glm::vec3 next,
+    const glm::vec3 last,
+    const float extrude,
+    size_t lineDataSize,
+    size_t i,
+    bool forward)
+{
+    glm::vec3 n0 = perp(curr - last);
+    glm::vec3 n1 = perp(next - curr);
+    bool right = glm::cross(n1, n0).z > 0.0;
+
+    if ((i == 1 && forward) || (i == lineDataSize - 2 && !forward)) {
+        line.push_back(last + n0 * extrude);
+        line.push_back(last - n0 * extrude);
+    }
+
+    if (right) {
+        glm::vec3 d0 = glm::normalize(last - curr);
+        glm::vec3 d1 = glm::normalize(next - curr);
+        glm::vec3 miter = computeMiterVector(d0, d1, n0, n1);
+        line.push_back(curr - miter * extrude);
+    } else {
+        line.push_back(curr - n0 * extrude);
+        line.push_back(curr - n1 * extrude);
+    }
+}
+
 void adjustTerrainEdges(std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData) {
     for (auto& tileData0 : heightData) {
         auto& tileHeight0 = tileData0.second;
@@ -838,54 +886,27 @@ int vectiler(Params exportParams) {
 
                         if (exportParams.roads) {
                             for (Line& line : feature.lines) {
-                                Polygon p;
+                                Polygon polygon;
                                 float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
-                                p.emplace_back();
+                                polygon.emplace_back();
+                                Line& polygonLine = polygon.back();
 
                                 if (line.size() == 2) {
                                     glm::vec3 curr = line[0];
                                     glm::vec3 next = line[1];
                                     glm::vec3 n0 = perp(next - curr);
 
-                                    p.back().push_back(curr - n0 * extrude);
-                                    p.back().push_back(curr + n0 * extrude);
-                                    p.back().push_back(next + n0 * extrude);
-                                    p.back().push_back(next - n0 * extrude);
+                                    polygonLine.push_back(curr - n0 * extrude);
+                                    polygonLine.push_back(curr + n0 * extrude);
+                                    polygonLine.push_back(next + n0 * extrude);
+                                    polygonLine.push_back(next - n0 * extrude);
                                 } else {
                                     glm::vec3 last = line[0];
                                     for (int i = 1; i < line.size() - 1; ++i) {
                                         glm::vec3 curr = line[i];
                                         glm::vec3 next = line[i+1];
-                                        glm::vec3 n0 = perp(curr - last);
-                                        glm::vec3 n1 = perp(next - curr);
-                                        glm::vec3 d0 = glm::normalize(last - curr);
-                                        glm::vec3 d1 = glm::normalize(next - curr);
-                                        bool right = glm::cross(n1, n0).z > 0.0;
-                                        glm::vec3 miter = glm::normalize(n0 + n1);
-                                        float miterl2 = glm::dot(miter, miter);
-
-                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
-                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
-                                        } else {
-                                            float theta;
-                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
-                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
-                                            if (theta < 0.f) { theta += 2 * M_PI; }
-                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
-                                        }
-
-                                        if (i == 1) {
-                                            p.back().push_back(last + n0 * extrude);
-                                            p.back().push_back(last - n0 * extrude);
-                                        }
-
-                                        if (right) {
-                                            p.back().push_back(curr - miter * extrude);
-                                        } else {
-                                            p.back().push_back(curr - n0 * extrude);
-                                            p.back().push_back(curr - n1 * extrude);
-                                        }
-
+                                        addPolygonPolylinePoint(polygonLine, curr, next, last, extrude,
+                                            line.size(), i, true);
                                         last = curr;
                                     }
 
@@ -893,69 +914,41 @@ int vectiler(Params exportParams) {
                                     for (int i = line.size() - 2; i > 0; --i) {
                                         glm::vec3 curr = line[i];
                                         glm::vec3 next = line[i-1];
-                                        glm::vec3 n0 = perp(curr - last);
-                                        glm::vec3 n1 = perp(next - curr);
-                                        glm::vec3 d0 = glm::normalize(last - curr);
-                                        glm::vec3 d1 = glm::normalize(next - curr);
-                                        bool right = glm::cross(n1, n0).z > 0.0;
-                                        glm::vec3 miter = glm::normalize(n0 + n1);
-                                        float miterl2 = glm::dot(miter, miter);
-
-                                        if (miterl2 < std::numeric_limits<float>::epsilon()) {
-                                            miter = glm::vec3(n1.y - n0.y, n0.x - n1.x, 0.0);
-                                        } else {
-                                            float theta;
-                                            if (right) { theta = atan2f(d1.y, d1.x) - atan2f(d0.y, d0.x);
-                                            } else { theta = atan2f(d0.y, d0.x) - atan2f(d1.y, d1.x); }
-                                            if (theta < 0.f) { theta += 2 * M_PI; }
-                                            miter *= 1.f / std::max<float>(sin(theta * 0.5f), EPSILON);
-                                        }
-
-                                        if (i == line.size() - 2) {
-                                            p.back().push_back(last + n0 * extrude);
-                                            p.back().push_back(last - n0 * extrude);
-                                        }
-
-                                        if (right) {
-                                            p.back().push_back(curr - miter * extrude);
-                                        } else {
-                                            p.back().push_back(curr - n0 * extrude);
-                                            p.back().push_back(curr - n1 * extrude);
-                                        }
-
+                                        addPolygonPolylinePoint(polygonLine, curr, next, last, extrude,
+                                            line.size(), i, false);
                                         last = curr;
                                     }
                                 }
 
-                                if (p.back().size() < 3) { continue; }
+                                if (polygonLine.size() < 4) { continue; }
 
                                 int count = 0;
-                                for (int i = 0; i < p.back().size(); i++) {
-                                    int j = (i + 1) % p.back().size();
-                                    int k = (i + 2) % p.back().size();
-                                    double z = (p.back()[j].x - p.back()[i].x)
-                                             * (p.back()[k].y - p.back()[j].y)
-                                             - (p.back()[j].y - p.back()[i].y)
-                                             * (p.back()[k].x - p.back()[j].x);
+                                for (int i = 0; i < polygonLine.size(); i++) {
+                                    int j = (i + 1) % polygonLine.size();
+                                    int k = (i + 2) % polygonLine.size();
+                                    double z = (polygonLine[j].x - polygonLine[i].x)
+                                             * (polygonLine[k].y - polygonLine[j].y)
+                                             - (polygonLine[j].y - polygonLine[i].y)
+                                             * (polygonLine[k].x - polygonLine[j].x);
                                     if (z < 0) { count--; }
                                     else if (z > 0) { count++; }
                                 }
 
                                 if (count > 0) { // CCW
-                                    std::reverse(p.back().begin(), p.back().end());
+                                    std::reverse(polygonLine.begin(), polygonLine.end());
                                 }
 
                                 // Close the polygon
-                                p.back().push_back(p.back()[0]);
+                                polygonLine.push_back(polygonLine[0]);
 
                                 size_t offset = mesh->vertices.size();
 
                                 if (exportParams.roadsHeight > 0) {
-                                    buildPolygonExtrusion(p, 0.0, exportParams.roadsHeight * tile.invScale,
+                                    buildPolygonExtrusion(polygon, 0.0, exportParams.roadsHeight * tile.invScale,
                                         mesh->vertices, mesh->indices, nullptr, tile.invScale);
                                 }
 
-                                buildPolygon(p, exportParams.roadsHeight * tile.invScale, mesh->vertices,
+                                buildPolygon(polygon, exportParams.roadsHeight * tile.invScale, mesh->vertices,
                                     mesh->indices, nullptr, 0.f, tile.invScale);
 
                                 if (textureData) {
