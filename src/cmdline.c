@@ -51,12 +51,14 @@ int main(int argc, const char **argv) {
     flag_int(&normals, "normals", "Export with normals");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
-        (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
-        terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
-        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals};
+    struct Params parameters = {&name[0], {offsetX, offsetY}, (bool)splitMeshes, aoAtlasSize,
+        aoSamples, (bool)aoBaking, (bool)append, terrainSubdivision, terrainExtrusionScale,
+        buildingsExtrusionScale, roadsHeight, roadsExtrusionWidth, (bool)normals};
+    struct DownloadParams params = {&apiKey[0], tileX, tileY, tileZ, (bool)terrain, (bool)roads, (bool)buildings};
 
-    if (parameters.aoBaking && (parameters.terrain || parameters.roads)) {
+    parameters.download = params;
+
+    if (parameters.aoBaking && (parameters.download.terrain || parameters.download.roads)) {
         printf("Ambient occlusion baking not yet available when exporting with option --terrain or --roads\n");
         return EXIT_FAILURE;
     }

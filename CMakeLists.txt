@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8.8)
 project(vectiler)
 
-option(VECTILER_AOBAKER "Build vectiler with ao baker" ON)
+option(VECTILER_AOBAKER "Build vectiler with ao baker" OFF)
 
 set(AOBAKER_LIBS "")
 
@@ -82,7 +82,7 @@ set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/earcut.hpp/inclu
 
 include_directories(${INCLUDE_DIRS})
 
-add_library(vectiler ${VECTILER_SOURCES})
+add_library(vectiler ${VECTILER_SOURCES} ${HEADERS})
 
 add_executable(vectiler.out ${C_SOURCES})
 

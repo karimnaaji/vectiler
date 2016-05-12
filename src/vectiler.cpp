@@ -35,22 +35,13 @@ int aobaker_bake(
 
 #define EPSILON 1e-5f
 
-struct PolygonVertex {
-    glm::vec3 position;
-    glm::vec3 normal;
-};
-
-struct HeightData {
-    std::vector<std::vector<float>> elevation;
-    int width;
-    int height;
-};
-
-struct PolygonMesh {
-    std::vector<unsigned int> indices;
-    std::vector<PolygonVertex> vertices;
-    glm::vec2 offset;
-};
+Tile::Tile(int x, int y, int z)  : x(x), y(y), z(z) {
+        glm::dvec4 bounds = tileBounds(x, y, z, 256.0);
+        tileOrigin = glm::dvec2(0.5 * (bounds.x + bounds.z), -0.5 * (bounds.y + bounds.w));
+        double scale = 0.5 * glm::abs(bounds.x - bounds.z);
+        invScale = 1.0 / scale;
+    }
+}
 
 static size_t writeData(void* ptr, size_t size, size_t nmemb, void *stream) {
     ((std::stringstream*) stream)->write(reinterpret_cast<char*>(ptr), size * nmemb);
@@ -114,8 +105,7 @@ void computeNormals(PolygonMesh& mesh) {
 }
 
 std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
-    const Tile& tile,
-    float extrusionScale)
+    const Tile& tile)
 {
     std::stringstream out;
 
@@ -159,7 +149,7 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
 
             assert(x >= 0 && x <= width && y >= 0 && y <= height);
 
-            data->elevation[x][y] = elevation * extrusionScale;
+            data->elevation[x][y] = elevation;
         }
 
         return std::move(data);
@@ -549,7 +539,7 @@ void addPositions(std::ostream& file, const PolygonMesh& mesh, float offsetx, fl
  */
 bool saveOBJ(std::string outputOBJ,
     bool splitMeshes,
-    std::vector<std::unique_ptr<PolygonMesh>>& meshes,
+    const std::vector<std::unique_ptr<PolygonMesh>>& meshes,
     float offsetx,
     float offsety,
     bool append,
@@ -729,81 +719,69 @@ inline std::string terrainURL(const Tile& tile) {
         + std::to_string(tile.y) + ".png";
 }
 
-int vectiler(Params exportParams) {
-    std::string apiKey(exportParams.apiKey);
+bool vectiler_download(DownloadParams parameters,
+    const std::vector<Tile> tiles,
+    std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData,
+    std::unordered_map<Tile, std::unique_ptr<TileData>>& vectorTileData)
+{
+    std::string apiKey;
 
-    printf("Using API key %s\n", exportParams.apiKey);
-
-    std::vector<Tile> tiles;
-
-    /// Parse tile params
-    {
-        int startx, starty, endx, endy;
-
-        if (!extractTileRange(&startx, &endx, std::string(exportParams.tilex))) {
-            printf("Bad param: %s\n", exportParams.tilex);
-            return EXIT_FAILURE;
-        }
-
-        if (!extractTileRange(&starty, &endy, std::string(exportParams.tiley))) {
-            printf("Bad param: %s\n", exportParams.tiley);
-            return EXIT_FAILURE;
-        }
-
-        for (size_t x = startx; x <= endx; ++x) {
-            for (size_t y = starty; y <= endy; ++y) {
-                tiles.emplace_back(x, y, exportParams.tilez);
-            }
-        }
+    if (parameters.apiKey) {
+        apiKey = std::string(parameters.apiKey);
     }
+
+    printf("Using API key %s\n", apiKey.c_str());
+
+
 
     if (tiles.size() == 0) {
         printf("No tiles to download\n");
-        return EXIT_FAILURE;
+        return false;
     }
 
-    std::unordered_map<Tile, std::unique_ptr<HeightData>> heightData;
-    std::unordered_map<Tile, std::unique_ptr<TileData>> vectorTileData;
-
     /// Download data
-    {
-        printf("---- Downloading tile data ----\n");
+    printf("---- Downloading tile data ----\n");
 
-        for (auto tile : tiles) {
-            if (exportParams.terrain) {
-                std::string url = terrainURL(tile);
+    for (auto tile : tiles) {
+        if (parameters.terrain) {
+            std::string url = terrainURL(tile);
 
-                auto textureData = downloadHeightmapTile(url, tile,
-                    exportParams.terrainExtrusionScale);
-
-                if (!textureData) {
-                    printf("Failed to download heightmap texture data for tile %d %d %d\n",
-                        tile.x, tile.y, tile.z);
-                }
-
-                heightData[tile] = std::move(textureData);
+            auto textureData = downloadHeightmapTile(url, tile);
+            if (!textureData) {
+                printf("Failed to download heightmap texture data for tile %d %d %d\n",
+                       tile.x, tile.y, tile.z);
             }
 
-            if (exportParams.buildings || exportParams.roads) {
-               std::string url = vectorTileURL(tile, apiKey);
+            heightData[tile] = std::move(textureData);
+        }
 
-                auto tileData = downloadTile(url, tile);
+        if (parameters.buildings || parameters.roads) {
+            std::string url = vectorTileURL(tile, apiKey);
 
-                if (!tileData) {
-                    printf("Failed to download vector tile data for tile %d %d %d\n",
-                        tile.x, tile.y, tile.z);
-                }
+            auto tileData = downloadTile(url, tile);
 
-                vectorTileData[tile] = std::move(tileData);
+            if (!tileData) {
+                printf("Failed to download vector tile data for tile %d %d %d\n",
+                       tile.x, tile.y, tile.z);
             }
+
+            vectorTileData[tile] = std::move(tileData);
         }
     }
 
     /// Adjust terrain edges
-    if (exportParams.terrain) {
+    if (parameters.terrain) {
         adjustTerrainEdges(heightData);
     }
 
+    return true;
+}
+
+std::vector<std::unique_ptr<PolygonMesh>> vectiler_build(Params params,
+    std::unordered_map<Tile, std::unique_ptr<HeightData>>& heightData,
+    std::unordered_map<Tile, std::unique_ptr<TileData>>& vectorTileData,
+    const std::vector<Tile>& tiles)
+{
     std::vector<std::unique_ptr<PolygonMesh>> meshes;
 
     glm::vec2 offset;
@@ -821,7 +799,7 @@ int vectiler(Params exportParams) {
         const auto& textureData = heightData[tile];
 
         /// Build terrain mesh
-        if (exportParams.terrain) {
+        if (params.download.terrain) {
             url = terrainURL(tile);
 
             const auto& textureData = heightData[tile];
@@ -835,7 +813,7 @@ int vectiler(Params exportParams) {
                 /// Extract a plane geometry, vertices in [-1.0,1.0]
                 {
                     buildPlane(mesh->vertices, mesh->indices, 2.0, 2.0,
-                        exportParams.terrainSubdivision, exportParams.terrainSubdivision);
+                        params.terrainSubdivision, params.terrainSubdivision);
 
                     // Build terrain mesh extrusion, with bilinear height sampling
                     for (auto& vertex : mesh->vertices) {
@@ -848,7 +826,7 @@ int vectiler(Params exportParams) {
                 }
 
                 /// Compute faces normals
-                if (exportParams.normals) {
+                if (params.normals) {
                     computeNormals(*mesh);
                 }
 
@@ -858,7 +836,7 @@ int vectiler(Params exportParams) {
         }
 
         /// Build vector tile mesh
-        if (exportParams.buildings || exportParams.roads) {
+        if (params.download.buildings || params.download.roads) {
             const auto& data = vectorTileData[tile];
 
             if (data) {
@@ -870,7 +848,7 @@ int vectiler(Params exportParams) {
                         if (textureData && layer.name != "buildings" && layer.name != "roads") { continue; }
                         auto itHeight = feature.props.numericProps.find(keyHeight);
                         auto itMinHeight = feature.props.numericProps.find(keyMinHeight);
-                        float scale = tile.invScale * exportParams.buildingsExtrusionScale;
+                        float scale = tile.invScale * params.buildingsExtrusionScale;
                         double height = 0.0;
                         double minHeight = 0.0;
 
@@ -888,7 +866,7 @@ int vectiler(Params exportParams) {
 
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
 
-                        if (exportParams.buildings) {
+                        if (params.download.buildings) {
                             for (const Polygon& polygon : feature.polygons) {
                                 float centroidHeight = 0.f;
                                 if (minHeight != height) {
@@ -901,10 +879,10 @@ int vectiler(Params exportParams) {
                             }
                         }
 
-                        if (exportParams.roads) {
+                        if (params.download.roads) {
                             for (Line& line : feature.lines) {
                                 Polygon polygon;
-                                float extrude = exportParams.roadsExtrusionWidth * tile.invScale;
+                                float extrude = params.roadsExtrusionWidth * tile.invScale;
                                 polygon.emplace_back();
                                 Line& polygonLine = polygon.back();
 
@@ -960,12 +938,12 @@ int vectiler(Params exportParams) {
 
                                 size_t offset = mesh->vertices.size();
 
-                                if (exportParams.roadsHeight > 0) {
-                                    buildPolygonExtrusion(polygon, 0.0, exportParams.roadsHeight * tile.invScale,
+                                if (params.roadsHeight > 0) {
+                                    buildPolygonExtrusion(polygon, 0.0, params.roadsHeight * tile.invScale,
                                         mesh->vertices, mesh->indices, nullptr, tile.invScale);
                                 }
 
-                                buildPolygon(polygon, exportParams.roadsHeight * tile.invScale, mesh->vertices,
+                                buildPolygon(polygon, params.roadsHeight * tile.invScale, mesh->vertices,
                                     mesh->indices, nullptr, 0.f, tile.invScale);
 
                                 if (textureData) {
@@ -976,7 +954,7 @@ int vectiler(Params exportParams) {
                                 }
                             }
 
-                            if (exportParams.normals && exportParams.terrain) {
+                            if (params.normals && params.download.terrain) {
                                 computeNormals(*mesh);
                             }
                         }
@@ -990,11 +968,19 @@ int vectiler(Params exportParams) {
         }
     }
 
+    return meshes;
+}
+
+bool vectiler_export(Params params,
+    const std::vector<std::unique_ptr<PolygonMesh>>& meshes,
+    std::vector<Tile> tiles)
+{
     std::string outFile;
 
-    if (exportParams.filename) {
-        outFile = std::string(exportParams.filename);
+    if (params.filename) {
+        outFile = std::string(params.filename);
     } else {
+        Tile origin = tiles[0];
         outFile = std::to_string(origin.x) + "."
                 + std::to_string(origin.y) + "."
                 + std::to_string(origin.z);
@@ -1004,24 +990,24 @@ int vectiler(Params exportParams) {
 
     // Save output OBJ file
     bool saved = saveOBJ(outputOBJ,
-        exportParams.splitMesh, meshes,
-        exportParams.offset[0],
-        exportParams.offset[1],
-        exportParams.append,
-        exportParams.normals);
+        params.splitMesh, meshes,
+        params.offset[0],
+        params.offset[1],
+        params.append,
+        params.normals);
 
     if (!saved) {
-        return EXIT_FAILURE;
+        return false;
     }
 
     // Bake ambiant occlusion using AO Baker
-    if (exportParams.aoBaking) {
+    if (params.aoBaking) {
         std::string aoFile = outFile + "-ao.obj";
         std::string aoImageFile = outFile + ".png";
         std::string aoMaterialFile = outFile + ".mtl";
 
         bool aoBaked = aobaker_bake(outputOBJ.c_str(), aoFile.c_str(), aoImageFile.c_str(),
-            exportParams.aoSizeHint, exportParams.aoSamples,
+            params.aoSizeHint, params.aoSamples,
             false,  // g-buffers
             false,  // charinfo
             1.0);   // multiply
@@ -1077,9 +1063,67 @@ int vectiler(Params exportParams) {
         }
 
         if (!success) {
-            return EXIT_FAILURE;
+            return false;
         }
     }
 
-    return EXIT_SUCCESS;
+    return true;
+}
+
+bool vectiler_parse_tile_range(const std::string& tilex,
+    const std::string& tiley,
+    int tilez,
+    std::vector<Tile>& tiles)
+{
+    int startx, starty, endx, endy;
+
+    if (!extractTileRange(&startx, &endx, tilex)) {
+        printf("Bad param: %s\n", tilex.c_str());
+        return false;
+    }
+
+    if (!extractTileRange(&starty, &endy, tiley)) {
+        printf("Bad param: %s\n", tiley.c_str());
+        return false;
+    }
+
+    for (size_t x = startx; x <= endx; ++x) {
+        for (size_t y = starty; y <= endy; ++y) {
+            tiles.emplace_back(x, y, tilez);
+        }
+    }
+
+    return true;
+}
+
+int vectiler(Params params) {
+    std::vector<Tile> tiles;
+
+    if (!vectiler_parse_tile_range(std::string(params.download.tilex), std::string(params.download.tiley),
+        params.download.tilez, tiles))
+    {
+        return EXIT_FAILURE;
+    }
+
+    std::unordered_map<Tile, std::unique_ptr<HeightData>> heightData;
+    std::unordered_map<Tile, std::unique_ptr<TileData>> vectorTileData;
+    if (!vectiler_download(params.download, tiles, heightData, vectorTileData)) {
+        return EXIT_FAILURE;
+    }
+
+    /// Apply terrain extrusion factor
+    if (params.download.terrain) {
+        for (auto& tileData : heightData) {
+            auto& tileHeight = tileData.second;
+            for (size_t y = 0; y < tileHeight->height; ++y) {
+                for (size_t x = 0; x < tileHeight->width; ++x) {
+                    tileHeight->elevation[x][y] *= params.terrainExtrusionScale;
+                }
+            }
+        }
+    }
+
+    auto meshes = vectiler_build(params, heightData, vectorTileData, tiles);
+
+    return vectiler_export(params, meshes, tiles) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
