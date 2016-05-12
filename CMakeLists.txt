@@ -1,44 +1,58 @@
 cmake_minimum_required(VERSION 2.8.8)
 project(vectiler)
 
-# aobaker
-add_subdirectory(${PROJECT_SOURCE_DIR}/3rdparty/aobaker/thekla)
-add_subdirectory(${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/poshlib)
+option(VECTILER_AOBAKER "Build vectiler with ao baker" ON)
 
-exec_program(brew
-    ARGS "info embree | tr ' ' '\n' | grep Cellar"
-    OUTPUT_VARIABLE EMBREE_PATH)
-
-exec_program(brew
-    ARGS "info tbb | tr ' ' '\n' | grep Cellar"
-    OUTPUT_VARIABLE TBB_PATH)
-
+set(AOBAKER_LIBS "")
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+
+if (VECTILER_AOBAKER)
+    message(STATUS "Building with ao baker")
+    add_definitions(-DAOBAKER)
+
+    # aobaker
+    add_subdirectory(${PROJECT_SOURCE_DIR}/3rdparty/aobaker/thekla)
+    add_subdirectory(${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/poshlib)
+
+    exec_program(brew
+        ARGS "info embree | tr ' ' '\n' | grep Cellar"
+        OUTPUT_VARIABLE EMBREE_PATH)
+
+    exec_program(brew
+        ARGS "info tbb | tr ' ' '\n' | grep Cellar"
+        OUTPUT_VARIABLE TBB_PATH)
+
+    if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
+    endif()
+
+    add_definitions(
+        -O3
+        -I${EMBREE_PATH}/include
+        -I${TBB_PATH}/include
+        -Wall)
+
+    link_directories(
+        ${EMBREE_PATH}/lib
+        ${TBB_PATH}/lib)
+
+    include_directories(
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/thekla/thekla
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/flag
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/stb
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/tinyobj)
+
+    add_library(aobaker
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/raytrace.cpp
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/aobaker.cpp)
+
+    set(AOBAKER_LIBS aobaker thekla_atlas embree tbb)
+else()
+    include_directories(
+        ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/flag)
 endif()
-
-add_definitions(
-    -O3
-    -I${EMBREE_PATH}/include
-    -I${TBB_PATH}/include
-    -Wall)
-
-link_directories(
-    ${EMBREE_PATH}/lib
-    ${TBB_PATH}/lib)
-
-include_directories(
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/thekla/thekla
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/flag
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/stb
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/tinyobj)
-
-add_library(aobaker
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/raytrace.cpp
-    ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/aobaker.cpp)
 
 file(GLOB_RECURSE C_SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
 file(GLOB_RECURSE VECTILER_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
@@ -71,7 +85,7 @@ add_library(vectiler ${VECTILER_SOURCES})
 
 add_executable(vectiler.out ${C_SOURCES})
 
-set(VECTILER_LIBS aobaker thekla_atlas embree tbb ${LIBS})
+set(VECTILER_LIBS ${AOBAKER_LIBS} ${LIBS})
 
 target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
 

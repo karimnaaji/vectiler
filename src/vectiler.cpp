@@ -10,11 +10,28 @@
 #include "geojson.h"
 #include "tiledata.h"
 #include "vectiler.h"
-#include "aobaker.h"
 #include "earcut.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+#ifdef AOBAKER
+#include "aobaker.h"
+#else
+int aobaker_bake(
+    char const* inputmesh,
+    char const* outputmesh,
+    char const* outputatlas,
+    int sizehint,
+    int nsamples,
+    bool gbuffer,
+    bool chartinfo,
+    float multiply)
+{
+    printf("WARNING -- Vectiler was built without ao baker\n");
+    return 0;
+}
+#endif
 
 #define EPSILON 1e-5f
 
