@@ -5,7 +5,6 @@ option(VECTILER_AOBAKER "Build vectiler with ao baker" ON)
 
 set(AOBAKER_LIBS "")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 
 if (VECTILER_AOBAKER)
     message(STATUS "Building with ao baker")
@@ -23,6 +22,7 @@ if (VECTILER_AOBAKER)
         ARGS "info tbb | tr ' ' '\n' | grep Cellar"
         OUTPUT_VARIABLE TBB_PATH)
 
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
     if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
     endif()
@@ -50,6 +50,7 @@ if (VECTILER_AOBAKER)
 
     set(AOBAKER_LIBS aobaker thekla_atlas embree tbb)
 else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
     include_directories(
         ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/flag)
 endif()
