@@ -36,11 +36,10 @@ int aobaker_bake(
 #define EPSILON 1e-5f
 
 Tile::Tile(int x, int y, int z)  : x(x), y(y), z(z) {
-        glm::dvec4 bounds = tileBounds(x, y, z, 256.0);
-        tileOrigin = glm::dvec2(0.5 * (bounds.x + bounds.z), -0.5 * (bounds.y + bounds.w));
-        double scale = 0.5 * glm::abs(bounds.x - bounds.z);
-        invScale = 1.0 / scale;
-    }
+    glm::dvec4 bounds = tileBounds(x, y, z, 256.0);
+    tileOrigin = glm::dvec2(0.5 * (bounds.x + bounds.z), -0.5 * (bounds.y + bounds.w));
+    double scale = 0.5 * glm::abs(bounds.x - bounds.z);
+    invScale = 1.0 / scale;
 }
 
 static size_t writeData(void* ptr, size_t size, size_t nmemb, void *stream) {
@@ -520,10 +519,10 @@ void addNormals(std::ostream& file, const PolygonMesh& mesh) {
     }
 }
 
-void addPositions(std::ostream& file, const PolygonMesh& mesh, float offsetx, float offsety) {
+void addPositions(std::ostream& file, const PolygonMesh& mesh) {
     for (auto vertex : mesh.vertices) {
-        file << "v " << vertex.position.x + offsetx + mesh.offset.x << " "
-             << vertex.position.y + offsety + mesh.offset.y << " "
+        file << "v " << vertex.position.x + mesh.offset.x << " "
+             << vertex.position.y + mesh.offset.y << " "
              << vertex.position.z << "\n";
     }
 }
@@ -533,15 +532,12 @@ void addPositions(std::ostream& file, const PolygonMesh& mesh, float offsetx, fl
  * - outputOBJ: the output filename of the wavefront object file
  * - splitMeshes: will enable exporting meshes as single objects within
  *   the wavefront file
- * - offsetx/y: are global offset, additional to the inner mesh offset
  * - append: option will append meshes to an existing obj file
  *   (filename should be the same)
  */
 bool saveOBJ(std::string outputOBJ,
     bool splitMeshes,
     const std::vector<std::unique_ptr<PolygonMesh>>& meshes,
-    float offsetx,
-    float offsety,
     bool append,
     bool normals)
 {
@@ -609,7 +605,7 @@ bool saveOBJ(std::string outputOBJ,
 
                     file << "o mesh" << meshCnt++ << "\n";
 
-                    addPositions(file, *mesh, offsetx, offsety);
+                    addPositions(file, *mesh);
                     nVertex += mesh->vertices.size();
 
                     if (normals) {
@@ -628,7 +624,7 @@ bool saveOBJ(std::string outputOBJ,
 
                 for (const auto& mesh : meshes) {
                     if (mesh->vertices.size() == 0) { continue; }
-                    addPositions(file, *mesh, offsetx, offsety);
+                    addPositions(file, *mesh);
                     nVertex += mesh->vertices.size();
                 }
 
@@ -991,8 +987,6 @@ bool vectiler_export(Params params,
     // Save output OBJ file
     bool saved = saveOBJ(outputOBJ,
         params.splitMesh, meshes,
-        params.offset[0],
-        params.offset[1],
         params.append,
         params.normals);
 

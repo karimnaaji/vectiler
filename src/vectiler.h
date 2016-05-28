@@ -22,7 +22,6 @@ struct DownloadParams {
 
 struct Params {
     const char* filename;
-    float offset[2];
     bool splitMesh;
     int aoSizeHint;
     int aoSamples;

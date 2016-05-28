@@ -8,6 +8,8 @@
 #include "tiledata.h"
 #include "projection.h"
 
+class Tile;
+
 namespace GeoJson {
     bool extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile, Point* last = nullptr);
     void extractLine(const rapidjson::Value& _in, Line& _out, const Tile& _tile);

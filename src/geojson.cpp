@@ -1,5 +1,6 @@
 #include "geojson.h"
 #include "glm/glm.hpp"
+#include "vectiler.h"
 
 bool GeoJson::extractPoint(const rapidjson::Value& _in, Point& _out, const Tile& _tile, Point* last) {
     glm::vec2 pos = lonLatToMeters(glm::dvec2(_in[0].GetDouble(), _in[1].GetDouble()));

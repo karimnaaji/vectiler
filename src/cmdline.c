@@ -7,8 +7,6 @@ int main(int argc, const char **argv) {
     const char* tileX = "19294";
     const char* tileY = "24642";
     int tileZ = 16;
-    float offsetX = 0.f;
-    float offsetY = 0.f;
     int aoAtlasSize = 512;
     int aoSamples = 256;
     int aoBaking = 0;
@@ -34,8 +32,6 @@ int main(int argc, const char **argv) {
     flag_string(&tileX, "tilex", "Tile X (can be a tile range: 19294/19295)");
     flag_string(&tileY, "tiley", "Tile Y (can be a tile range: 24642/24643)");
     flag_int(&tileZ, "tilez", "Tile Z (zoom)");
-    flag_float(&offsetX, "offsetx", "Global tile Offset on X coordinate");
-    flag_float(&offsetY, "offsety", "Global tile Offset on Y coordinate");
     flag_int(&append, "append", "Append the obj to an existing obj file");
     flag_int(&buildings, "buildings", "Whether to export building geometry");
     flag_float(&buildingsExtrusionScale, "buildingsExtrusionScale", "Building height scale factor");
@@ -51,7 +47,7 @@ int main(int argc, const char **argv) {
     flag_int(&normals, "normals", "Export with normals");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    struct Params parameters = {&name[0], {offsetX, offsetY}, (bool)splitMeshes, aoAtlasSize,
+    struct Params parameters = {&name[0], (bool)splitMeshes, aoAtlasSize,
         aoSamples, (bool)aoBaking, (bool)append, terrainSubdivision, terrainExtrusionScale,
         buildingsExtrusionScale, roadsHeight, roadsExtrusionWidth, (bool)normals};
     struct DownloadParams params = {&apiKey[0], tileX, tileY, tileZ, (bool)terrain, (bool)roads, (bool)buildings};
