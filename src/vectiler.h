@@ -75,6 +75,7 @@ struct PolygonMesh {
     std::vector<unsigned int> indices;
     std::vector<PolygonVertex> vertices;
     glm::vec2 offset;
+    glm::vec2 ntile;
 };
 
 bool vectiler_download(DownloadParams parameters,

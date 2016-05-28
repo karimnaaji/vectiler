@@ -521,9 +521,12 @@ void addNormals(std::ostream& file, const PolygonMesh& mesh) {
 
 void addPositions(std::ostream& file, const PolygonMesh& mesh) {
     for (auto vertex : mesh.vertices) {
-        file << "v " << vertex.position.x + mesh.offset.x << " "
-             << vertex.position.y + mesh.offset.y << " "
-             << vertex.position.z << "\n";
+        float x = vertex.position.x + 1.0;
+        float y = vertex.position.y + 1.0;
+        x = (x / mesh.ntile.x) - 1.0;
+        y = (y / mesh.ntile.y) - 1.0;
+        file << "v " << x << " " << y << " "
+             << vertex.position.z / (mesh.ntile.x) << "\n";
     }
 }
 
@@ -747,6 +750,9 @@ std::vector<std::unique_ptr<PolygonMesh>> vectiler_build(Params params,
 
     printf("---- Building tile data ----\n");
 
+    int ntilex = std::abs(tiles[0].x - tiles[tiles.size() - 1].x) + 1;
+    int ntiley = std::abs(tiles[0].y - tiles[tiles.size() - 1].y) + 1;
+
     // Build meshes for each of the tiles
     for (auto tile : tiles) {
         std::string url;
@@ -926,6 +932,31 @@ std::vector<std::unique_ptr<PolygonMesh>> vectiler_build(Params params,
         }
     }
 
+    for (auto& mesh : meshes) {
+        mesh->ntile = glm::vec2(ntilex, ntiley);
+    }
+
+    printf("Ntile x %d, ntile y %d\n", ntilex, ntiley);
+
+    for (auto& mesh : meshes) {
+        for (auto& v : mesh->vertices) {
+            v.position.x += mesh->offset.x;
+            v.position.y -= mesh->offset.y;
+#if 0
+            min = glm::min(min, glm::vec2(v.position));
+            max = glm::max(max, glm::vec2(v.position));
+#endif
+        }
+    }
+#if 0
+
+    for (auto& mesh : meshes) {
+        mesh->max = max;
+        mesh->min = min;
+    }
+
+    printf("min: %f %f, max %f %f\n", min.x, min.y, max.x, max.y);
+#endif
     return meshes;
 }
 
