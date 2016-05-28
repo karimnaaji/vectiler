@@ -541,44 +541,6 @@ bool saveOBJ(std::string outputOBJ,
     bool append,
     bool normals)
 {
-    size_t maxindex = 0;
-
-    /// Find max index from previously existing wavefront vertices
-    {
-        std::ifstream filein(outputOBJ.c_str(), std::ios::in);
-        std::string token;
-
-        if (filein.good() && append) {
-            // TODO: optimize this
-            while (!filein.eof()) {
-                filein >> token;
-                if (token == "f") {
-                    std::string faceLine;
-                    getline(filein, faceLine);
-
-                    for (unsigned int i = 0; i < faceLine.length(); ++i) {
-                        if (faceLine[i] == '/') {
-                            faceLine[i] = ' ';
-                        }
-                    }
-
-                    std::stringstream ss(faceLine);
-                    std::string faceToken;
-
-                    for (int i = 0; i < 6; ++i) {
-                        ss >> faceToken;
-                        if (faceToken.find_first_not_of("\t\n ") != std::string::npos) {
-                            size_t index = atoi(faceToken.c_str());
-                            maxindex = index > maxindex ? index : maxindex;
-                        }
-                    }
-                }
-            }
-
-            filein.close();
-        }
-    }
-
     /// Save obj file
     {
         std::ofstream file;
@@ -595,7 +557,7 @@ bool saveOBJ(std::string outputOBJ,
             file << "# exported with vectiler: https://github.com/karimnaaji/vectiler" << "\n";
             file << "\n";
 
-            int indexOffset = maxindex;
+            int indexOffset = 0;
 
             if (splitMeshes) {
                 int meshCnt = 0;
