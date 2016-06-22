@@ -5,6 +5,7 @@
 #include <fstream>
 #include <unordered_map>
 #include <limits>
+#include <memory>
 
 #include "rapidjson/document.h"
 #include "geojson.h"

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "glm/glm.hpp"
-#include "util.h"
 #include <cmath>
 #include <functional>
 
