@@ -21,7 +21,7 @@ First initialize submodules by running:
 $ git submodule update --init --recursive
 ```
 
-**install dependecies (OS X)**
+**install dependencies (OS X)**
 
 aobaker needs [embree](https://embree.github.io/) for optimal ray tracing and tbb, you can install it using [homebrew](http://brew.sh/):
 
@@ -108,15 +108,3 @@ Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
 ```sh
 $ ./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
 ```
-
-**build and run the viewer (OS X)**
-
-A minimal viewer using [oglw](https://github.com/karimnaaji/oglw) can be used to preview the obj tiles:
-
-```sh
-$ cd renderer
-$ cmake . -Bbuild
-$ cmake --build build
-$ open viewer.app --args ~/dev/obj-export/build/19294.24642.16-ao.obj ~/dev/obj-export/build/19294.24642.16.png
-```
-
