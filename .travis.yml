@@ -1,7 +1,22 @@
-language: objective-c
-osx_image: xcode7
+matrix:
+  include:
+    - os: linux
+      #dist: trusty
+      env: PLATFORM=linux CXX=g++-4.9 CC=gcc-4.9
+      addons:
+        apt:
+          sources: [ 'ubuntu-toolchain-r-test' ]
+          packages: [ 'cmake', 'gcc-4.9', 'g++-4.9' ]
+    - os: osx
+      env: PLATFORM=osx
+      compiler: clang
+      #osx_image: xcode7
+
+before_install:
+  - git submodule update --init --recursive
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install embree tbb cmake ; fi
+
 script:
-    - cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula
-    - brew install embree tbb cmake
-    - cmake . -Bbuild
-    - cmake --build build
+  - cmake . -Bbuild
+  - cmake --build build

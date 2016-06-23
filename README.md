@@ -30,6 +30,18 @@ $ cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula
 $ brew install embree tbb cmake
 ```
 
+**install dependencies (Linux)**
+
+Linux port doesn't currently use aobaker.
+To build vectiler you will need a compiler that supports `c++11`, for example with `g++-4.9` on an ubuntu machine:
+
+```
+$ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+$ sudo apt-get update
+# install curl/g++/cmake
+$ sudo apt-get install g++-4.9 cmake libcurl4-openssl-dev
+```
+
 **build**
 
 To build with cmake in a `build/` directory run the following:

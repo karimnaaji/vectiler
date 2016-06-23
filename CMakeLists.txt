@@ -1,10 +1,19 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 2.8.7)
 project(vectiler)
 
-option(VECTILER_AOBAKER "Build vectiler with ao baker" ON)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    option(VECTILER_AOBAKER "Build vectiler with ao baker" ON)
+else()
+    option(VECTILER_AOBAKER "Build vectiler with ao baker" OFF)
+
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++")
+    endif()
+endif()
 
 set(AOBAKER_LIBS "")
-
 
 if (VECTILER_AOBAKER)
     message(STATUS "Building with ao baker")
@@ -55,6 +64,10 @@ else()
         ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/vendor/flag)
 endif()
 
+message(STATUS "CXX Flags ${CMAKE_CXX_FLAGS}")
+
+include_directories(${PROJECT_SOURCE_DIR}/src)
+
 file(GLOB_RECURSE C_SOURCES ${PROJECT_SOURCE_DIR}/src/*.c)
 file(GLOB_RECURSE VECTILER_SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 file(GLOB_RECURSE HEADERS ${PROJECT_SOURCE_DIR}/src/*.h)
@@ -88,7 +101,7 @@ add_executable(vectiler.out ${C_SOURCES})
 
 set(VECTILER_LIBS ${AOBAKER_LIBS} ${LIBS})
 
-target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
+target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler -lcurl)
 
 if (BUILD_TESTS)
     message(STATUS "Build unit tests")
