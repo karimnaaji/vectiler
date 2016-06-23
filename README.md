@@ -30,6 +30,17 @@ $ cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula
 $ brew install embree tbb cmake
 ```
 
+**install dependencies (Linux)**
+
+Linux port doesn't currently use aobaker, you will need a `c++11` compiler, for example on ubuntu with `g++-4.9`:
+
+```
+$ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
+$ sudo apt-get update
+# install curl/g++/cmake
+$ sudo apt-get install g++-4.9 cmake libcurl4-openssl-dev
+```
+
 **build**
 
 To build with cmake in a `build/` directory run the following:
