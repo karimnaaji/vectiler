@@ -596,12 +596,11 @@ bool saveOBJ(std::string outputOBJ,
 
     /// Save obj file
     {
-        std::ofstream file;
+        std::ofstream file(outputOBJ);
+
         if (append) {
-            file = std::ofstream(outputOBJ, std::ios_base::app);
-        } else {
-            file = std::ofstream(outputOBJ);
-        }
+	    file.seekp(std::ios_base::end);
+	}
 
         if (file.is_open()) {
             size_t nVertex = 0;
@@ -1043,7 +1042,7 @@ int vectiler(Params exportParams) {
 
         // Inject material to wavefront
         {
-            std::ofstream ofile = std::ofstream(aoFile);
+            std::ofstream ofile(aoFile);
             success &= ofile.is_open();
 
             if (success) {
@@ -1059,7 +1058,7 @@ int vectiler(Params exportParams) {
 
         // Export material properties
         {
-            std::ofstream materialfile = std::ofstream(aoMaterialFile);
+            std::ofstream materialfile(aoMaterialFile);
             success &= materialfile.is_open();
 
             if (success) {
