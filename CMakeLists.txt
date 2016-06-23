@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 2.8.7)
 project(vectiler)
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
