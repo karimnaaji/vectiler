@@ -32,7 +32,8 @@ $ brew install embree tbb cmake
 
 **install dependencies (Linux)**
 
-Linux port doesn't currently use aobaker, you will need a `c++11` compiler, for example on ubuntu with `g++-4.9`:
+Linux port doesn't currently use aobaker.
+To build vectiler you will need a compiler that supports `c++11`, for example with `g++-4.9` on an ubuntu machine:
 
 ```
 $ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
