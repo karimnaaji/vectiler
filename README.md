@@ -67,6 +67,7 @@ $ cmake --build build
     --append                   Append the obj to an existing obj file (0)
     --buildings                Whether to export building geometry (1)
     --buildingsExtrusionScale  Building height scale factor (1.0)
+    --buildingsHeight          The height at which building should be extruded (if no height data is available) (0.0)
     --terrain                  Generate terrain elevation topography (0)
     --terrainSubdivision       Terrain mesh subdivision (64)
     --terrainExtrusionScale    Terrain mesh extrusion scale (1.0)
@@ -76,7 +77,7 @@ $ cmake --build build
     --roads                    Whether to export roads geometry (0)
     --roadsHeight              The roads height offset (z-axis) (1.0)
     --roadsExtrusionWidth      The roads extrusion width (5.0)
-    --normals                  Export with normals (1)
+    --normals                  Export with normals (0)
     --version                  Output version
     --help                     Output help
 ```

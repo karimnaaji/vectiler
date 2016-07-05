@@ -89,7 +89,7 @@ bool downloadData(std::stringstream& out, const std::string& url) {
         printf(" -- OK\n");
     }
 
-    return result == CURLE_OK;
+    return result == CURLE_OK && out.rdbuf()->in_avail();
 }
 
 void computeNormals(PolygonMesh& mesh) {
@@ -163,7 +163,7 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
             data->elevation[x][y] = elevation * extrusionScale;
         }
 
-        return std::move(data);
+        return data;
     }
 
     return nullptr;
@@ -188,7 +188,7 @@ std::unique_ptr<TileData> downloadTile(const std::string& url, const Tile& tile)
             GeoJson::extractLayer(layer->value, data->layers.back(), tile);
         }
 
-        return std::move(data);
+        return data;
     }
 
     return nullptr;
@@ -873,6 +873,10 @@ int vectiler(Params exportParams) {
                         float scale = tile.invScale * exportParams.buildingsExtrusionScale;
                         double height = 0.0;
                         double minHeight = 0.0;
+
+                        if (layer.name == "buildings") {
+                            height = exportParams.buildingsHeight * tile.invScale;
+                        }
 
                         if (itHeight != feature.props.numericProps.end()) {
                             height = itHeight->second * scale;

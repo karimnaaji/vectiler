@@ -19,6 +19,7 @@ int main(int argc, const char **argv) {
     float terrainExtrusionScale = 1.f;
     int buildings = 1;
     float buildingsExtrusionScale = 1.f;
+    float buildingsHeight = 0.f;
     int roads = 0;
     float roadsHeight = 1.f;
     float roadsExtrusionWidth = 5.f;
@@ -39,6 +40,7 @@ int main(int argc, const char **argv) {
     flag_int(&append, "append", "Append the obj to an existing obj file");
     flag_int(&buildings, "buildings", "Whether to export building geometry");
     flag_float(&buildingsExtrusionScale, "buildingsExtrusionScale", "Building height scale factor");
+    flag_float(&buildingsHeight, "buildingsHeight", "The height at which building should be extruded (if no height data is available)");
     flag_int(&terrain, "terrain", "Generate terrain elevation topography");
     flag_int(&terrainSubdivision, "terrainSubdivision", "Terrain mesh subdivision");
     flag_float(&terrainExtrusionScale, "terrainExtrusionScale", "Terrain mesh extrusion scale");
@@ -54,7 +56,7 @@ int main(int argc, const char **argv) {
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
-        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals};
+        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals, buildingsHeight};
 
     if (parameters.aoBaking && (parameters.terrain || parameters.roads)) {
         printf("Ambient occlusion baking not yet available when exporting with option --terrain or --roads\n");
