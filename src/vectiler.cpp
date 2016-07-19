@@ -752,7 +752,25 @@ int vectiler(Params exportParams) {
 
         for (size_t x = startx; x <= endx; ++x) {
             for (size_t y = starty; y <= endy; ++y) {
-                tiles.emplace_back(x, y, exportParams.tilez);
+                Tile t(x, y, exportParams.tilez);
+
+                if (x == startx) {
+                    t.borders.set(Border::left, 1);
+                }
+
+                if (x == endx) {
+                    t.borders.set(Border::right, 1);
+                }
+
+                if (y == starty) {
+                    t.borders.set(Border::top, 1);
+                }
+
+                if (y == endy) {
+                    t.borders.set(Border::bottom, 1);
+                }
+
+                tiles.push_back(t);
             }
         }
     }
