@@ -1023,6 +1023,9 @@ int vectiler(Params exportParams) {
 
                         if (exportParams.buildings) {
                             for (const Polygon& polygon : feature.polygons) {
+                                if (!withinTileRange(centroid(polygon))) {
+                                    continue;
+                                }
                                 float centroidHeight = 0.f;
                                 if (minHeight != height) {
                                     centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
