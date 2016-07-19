@@ -274,7 +274,8 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
     float width,       // Total plane width (x-axis)
     float height,      // Total plane height (y-axis)
     unsigned int nw,   // Split on width
-    unsigned int nh)   // Split on height
+    unsigned int nh,   // Split on height
+    bool flip = false)
 {
     // TODO: add offsets
     std::vector<glm::vec4> vertices;
@@ -284,6 +285,13 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
 
     float ow = width / nw;
     float oh = height / nh;
+    static const glm::vec3 up(0.0, 0.0, 1.0);
+
+    glm::vec3 normal = up;
+
+    if (flip) {
+        normal *= -1.f;
+    }
 
     for (float w = -width / 2.0; w <= width / 2.0 - ow; w += ow) {
         for (float h = -height / 2.0; h <= height / 2.0 - oh; h += oh) {
@@ -292,19 +300,26 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
             glm::vec3 v2(w + ow, h, 0.0);
             glm::vec3 v3(w + ow, h + oh, 0.0);
 
-            static const glm::vec3 up(0.0, 0.0, 1.0);
+            outVertices.push_back({v0, normal});
+            outVertices.push_back({v1, normal});
+            outVertices.push_back({v2, normal});
+            outVertices.push_back({v3, normal});
 
-            outVertices.push_back({v0, up});
-            outVertices.push_back({v1, up});
-            outVertices.push_back({v2, up});
-            outVertices.push_back({v3, up});
-
-            outIndices.push_back(indexOffset+0);
-            outIndices.push_back(indexOffset+1);
-            outIndices.push_back(indexOffset+2);
-            outIndices.push_back(indexOffset+0);
-            outIndices.push_back(indexOffset+2);
-            outIndices.push_back(indexOffset+3);
+            if (!flip) {
+                outIndices.push_back(indexOffset+0);
+                outIndices.push_back(indexOffset+1);
+                outIndices.push_back(indexOffset+2);
+                outIndices.push_back(indexOffset+0);
+                outIndices.push_back(indexOffset+2);
+                outIndices.push_back(indexOffset+3);
+            } else {
+                outIndices.push_back(indexOffset+0);
+                outIndices.push_back(indexOffset+2);
+                outIndices.push_back(indexOffset+1);
+                outIndices.push_back(indexOffset+0);
+                outIndices.push_back(indexOffset+3);
+                outIndices.push_back(indexOffset+2);
+            }
 
             indexOffset += 4;
         }
@@ -849,11 +864,16 @@ int vectiler(Params exportParams) {
                     tile.x, tile.y, tile.z);
             } else {
                 auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+                auto ground = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+                auto wall = std::unique_ptr<PolygonMesh>(new PolygonMesh);
 
                 /// Extract a plane geometry, vertices in [-1.0,1.0]
                 {
                     buildPlane(mesh->vertices, mesh->indices, 2.0, 2.0,
                         exportParams.terrainSubdivision, exportParams.terrainSubdivision);
+
+                    buildPlane(ground->vertices, ground->indices, 2.0, 2.0,
+                        exportParams.terrainSubdivision, exportParams.terrainSubdivision, true);
 
                     // Build terrain mesh extrusion, with bilinear height sampling
                     for (auto& vertex : mesh->vertices) {
@@ -863,15 +883,92 @@ int vectiler(Params exportParams) {
                         // Scale the height within the tile scale
                         vertex.position.z = extrusion * tile.invScale;
                     }
+
+                    // Build walls
+                    {
+                        float offset = 1.0 / exportParams.terrainSubdivision;
+                        int vertexDataOffset = 0;
+
+                        for (int i = 0; i < tile.borders.size(); ++i) {
+                            if (!tile.borders[i]) {
+                                continue;
+                            }
+
+                            for (float x = -1.0; x < 1.0; x += offset) {
+                                static const glm::vec3 upVector(0.0, 0.0, 1.0);
+                                glm::vec3 v0, v1;
+
+                                if (i == Border::right) {
+                                    v0 = glm::vec3(1.0, x + offset, 0.0);
+                                    v1 = glm::vec3(1.0, x, 0.0);
+                                }
+
+                                if (i == Border::left) {
+                                    v0 = glm::vec3(-1.0, x + offset, 0.0);
+                                    v1 = glm::vec3(-1.0, x, 0.0);
+                                }
+
+                                if (i == Border::top) {
+                                    v0 = glm::vec3(x + offset, 1.0, 0.0);
+                                    v1 = glm::vec3(x, 1.0, 0.0);
+                                }
+
+                                if (i == Border::bottom) {
+                                    v0 = glm::vec3(x + offset, -1.0, 0.0);
+                                    v1 = glm::vec3(x, -1.0, 0.0);
+                                }
+
+                                glm::vec3 normalVector;
+
+                                normalVector = glm::cross(upVector, v0 - v1);
+                                normalVector = glm::normalize(normalVector);
+
+                                float h0 = sampleElevation(glm::vec2(v0.x, v0.y), textureData);
+                                float h1 = sampleElevation(glm::vec2(v1.x, v1.y), textureData);
+
+                                v0.z = h0 * tile.invScale;
+                                wall->vertices.push_back({v0, normalVector});
+                                v1.z = h1 * tile.invScale;
+                                wall->vertices.push_back({v1, normalVector});
+                                v0.z = 0.0;
+                                wall->vertices.push_back({v0, normalVector});
+                                v1.z = 0.0;
+                                wall->vertices.push_back({v1, normalVector});
+
+                                if (i == Border::right || i == Border::bottom) {
+                                    wall->indices.push_back(vertexDataOffset+0);
+                                    wall->indices.push_back(vertexDataOffset+1);
+                                    wall->indices.push_back(vertexDataOffset+2);
+                                    wall->indices.push_back(vertexDataOffset+1);
+                                    wall->indices.push_back(vertexDataOffset+3);
+                                    wall->indices.push_back(vertexDataOffset+2);
+                                } else {
+                                    wall->indices.push_back(vertexDataOffset+0);
+                                    wall->indices.push_back(vertexDataOffset+2);
+                                    wall->indices.push_back(vertexDataOffset+1);
+                                    wall->indices.push_back(vertexDataOffset+1);
+                                    wall->indices.push_back(vertexDataOffset+2);
+                                    wall->indices.push_back(vertexDataOffset+3);
+                                }
+
+                                vertexDataOffset += 4;
+                            }
+                        }
+                    }
                 }
 
                 /// Compute faces normals
                 if (exportParams.normals) {
                     computeNormals(*mesh);
+                    computeNormals(*ground);
                 }
 
                 mesh->offset = offset;
                 meshes.push_back(std::move(mesh));
+                ground->offset = offset;
+                meshes.push_back(std::move(ground));
+                wall->offset = offset;
+                meshes.push_back(std::move(wall));
             }
         }
 
