@@ -436,6 +436,82 @@ void buildPolygon(const Polygon& polygon,
     }
 }
 
+void buildPedestalPlanes(const Tile& tile,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices,
+    const std::unique_ptr<HeightData>& elevation,
+    unsigned int subdiv)
+{
+    float offset = 1.0 / subdiv;
+    int vertexDataOffset = outVertices.size();
+
+    for (int i = 0; i < tile.borders.size(); ++i) {
+        if (!tile.borders[i]) {
+            continue;
+        }
+
+        for (float x = -1.0; x < 1.0; x += offset) {
+            static const glm::vec3 upVector(0.0, 0.0, 1.0);
+            glm::vec3 v0, v1;
+
+            if (i == Border::right) {
+                v0 = glm::vec3(1.0, x + offset, 0.0);
+                v1 = glm::vec3(1.0, x, 0.0);
+            }
+
+            if (i == Border::left) {
+                v0 = glm::vec3(-1.0, x + offset, 0.0);
+                v1 = glm::vec3(-1.0, x, 0.0);
+            }
+
+            if (i == Border::top) {
+                v0 = glm::vec3(x + offset, 1.0, 0.0);
+                v1 = glm::vec3(x, 1.0, 0.0);
+            }
+
+            if (i == Border::bottom) {
+                v0 = glm::vec3(x + offset, -1.0, 0.0);
+                v1 = glm::vec3(x, -1.0, 0.0);
+            }
+
+            glm::vec3 normalVector;
+
+            normalVector = glm::cross(upVector, v0 - v1);
+            normalVector = glm::normalize(normalVector);
+
+            float h0 = sampleElevation(glm::vec2(v0.x, v0.y), elevation);
+            float h1 = sampleElevation(glm::vec2(v1.x, v1.y), elevation);
+
+            v0.z = h0 * tile.invScale;
+            outVertices.push_back({v0, normalVector});
+            v1.z = h1 * tile.invScale;
+            outVertices.push_back({v1, normalVector});
+            v0.z = 0.0;
+            outVertices.push_back({v0, normalVector});
+            v1.z = 0.0;
+            outVertices.push_back({v1, normalVector});
+
+            if (i == Border::right || i == Border::bottom) {
+                outIndices.push_back(vertexDataOffset+0);
+                outIndices.push_back(vertexDataOffset+1);
+                outIndices.push_back(vertexDataOffset+2);
+                outIndices.push_back(vertexDataOffset+1);
+                outIndices.push_back(vertexDataOffset+3);
+                outIndices.push_back(vertexDataOffset+2);
+            } else {
+                outIndices.push_back(vertexDataOffset+0);
+                outIndices.push_back(vertexDataOffset+2);
+                outIndices.push_back(vertexDataOffset+1);
+                outIndices.push_back(vertexDataOffset+1);
+                outIndices.push_back(vertexDataOffset+2);
+                outIndices.push_back(vertexDataOffset+3);
+            }
+
+            vertexDataOffset += 4;
+        }
+    }
+}
+
 glm::vec3 perp(const glm::vec3& v) {
     return glm::normalize(glm::vec3(-v.y, v.x, 0.0));
 }
@@ -772,15 +848,12 @@ int vectiler(Params exportParams) {
                 if (x == startx) {
                     t.borders.set(Border::left, 1);
                 }
-
                 if (x == endx) {
                     t.borders.set(Border::right, 1);
                 }
-
                 if (y == starty) {
                     t.borders.set(Border::top, 1);
                 }
-
                 if (y == endy) {
                     t.borders.set(Border::bottom, 1);
                 }
@@ -897,77 +970,8 @@ int vectiler(Params exportParams) {
                     buildPlane(ground->vertices, ground->indices, 2.0, 2.0,
                         exportParams.terrainSubdivision, exportParams.terrainSubdivision, true);
 
-                    // Build walls
-                    {
-                        float offset = 1.0 / exportParams.terrainSubdivision;
-                        int vertexDataOffset = 0;
-
-                        for (int i = 0; i < tile.borders.size(); ++i) {
-                            if (!tile.borders[i]) {
-                                continue;
-                            }
-
-                            for (float x = -1.0; x < 1.0; x += offset) {
-                                static const glm::vec3 upVector(0.0, 0.0, 1.0);
-                                glm::vec3 v0, v1;
-
-                                if (i == Border::right) {
-                                    v0 = glm::vec3(1.0, x + offset, 0.0);
-                                    v1 = glm::vec3(1.0, x, 0.0);
-                                }
-
-                                if (i == Border::left) {
-                                    v0 = glm::vec3(-1.0, x + offset, 0.0);
-                                    v1 = glm::vec3(-1.0, x, 0.0);
-                                }
-
-                                if (i == Border::top) {
-                                    v0 = glm::vec3(x + offset, 1.0, 0.0);
-                                    v1 = glm::vec3(x, 1.0, 0.0);
-                                }
-
-                                if (i == Border::bottom) {
-                                    v0 = glm::vec3(x + offset, -1.0, 0.0);
-                                    v1 = glm::vec3(x, -1.0, 0.0);
-                                }
-
-                                glm::vec3 normalVector;
-
-                                normalVector = glm::cross(upVector, v0 - v1);
-                                normalVector = glm::normalize(normalVector);
-
-                                float h0 = sampleElevation(glm::vec2(v0.x, v0.y), textureData);
-                                float h1 = sampleElevation(glm::vec2(v1.x, v1.y), textureData);
-
-                                v0.z = h0 * tile.invScale;
-                                wall->vertices.push_back({v0, normalVector});
-                                v1.z = h1 * tile.invScale;
-                                wall->vertices.push_back({v1, normalVector});
-                                v0.z = 0.0;
-                                wall->vertices.push_back({v0, normalVector});
-                                v1.z = 0.0;
-                                wall->vertices.push_back({v1, normalVector});
-
-                                if (i == Border::right || i == Border::bottom) {
-                                    wall->indices.push_back(vertexDataOffset+0);
-                                    wall->indices.push_back(vertexDataOffset+1);
-                                    wall->indices.push_back(vertexDataOffset+2);
-                                    wall->indices.push_back(vertexDataOffset+1);
-                                    wall->indices.push_back(vertexDataOffset+3);
-                                    wall->indices.push_back(vertexDataOffset+2);
-                                } else {
-                                    wall->indices.push_back(vertexDataOffset+0);
-                                    wall->indices.push_back(vertexDataOffset+2);
-                                    wall->indices.push_back(vertexDataOffset+1);
-                                    wall->indices.push_back(vertexDataOffset+1);
-                                    wall->indices.push_back(vertexDataOffset+2);
-                                    wall->indices.push_back(vertexDataOffset+3);
-                                }
-
-                                vertexDataOffset += 4;
-                            }
-                        }
-                    }
+                    buildPedestalPlanes(tile, wall->vertices, wall->indices, textureData,
+                        exportParams.terrainSubdivision);
 
                     ground->offset = offset;
                     meshes.push_back(std::move(ground));
