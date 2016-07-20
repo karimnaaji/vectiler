@@ -614,8 +614,8 @@ bool saveOBJ(std::string outputOBJ,
         std::ofstream file(outputOBJ);
 
         if (append) {
-	    file.seekp(std::ios_base::end);
-	}
+            file.seekp(std::ios_base::end);
+        }
 
         if (file.is_open()) {
             size_t nVertex = 0;
@@ -863,19 +863,15 @@ int vectiler(Params exportParams) {
                 printf("Failed to download heightmap texture data for tile %d %d %d\n",
                     tile.x, tile.y, tile.z);
             } else {
-                auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
-                auto ground = std::unique_ptr<PolygonMesh>(new PolygonMesh);
-                auto wall = std::unique_ptr<PolygonMesh>(new PolygonMesh);
 
-                /// Extract a plane geometry, vertices in [-1.0,1.0]
+                /// Extract a plane geometry, vertices in [-1.0,1.0], for terrain mesh
                 {
+                    auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+
                     buildPlane(mesh->vertices, mesh->indices, 2.0, 2.0,
                         exportParams.terrainSubdivision, exportParams.terrainSubdivision);
 
-                    buildPlane(ground->vertices, ground->indices, 2.0, 2.0,
-                        exportParams.terrainSubdivision, exportParams.terrainSubdivision, true);
-
-                    // Build terrain mesh extrusion, with bilinear height sampling
+                                    // Build terrain mesh extrusion, with bilinear height sampling
                     for (auto& vertex : mesh->vertices) {
                         glm::vec2 tilePosition = glm::vec2(vertex.position.x, vertex.position.y);
                         float extrusion = sampleElevation(tilePosition, textureData);
@@ -883,6 +879,23 @@ int vectiler(Params exportParams) {
                         // Scale the height within the tile scale
                         vertex.position.z = extrusion * tile.invScale;
                     }
+
+                    /// Compute faces normals
+                    if (exportParams.normals) {
+                        computeNormals(*mesh);
+                    }
+
+                    mesh->offset = offset;
+                    meshes.push_back(std::move(mesh));
+                }
+
+                /// Build pedestal
+                if (exportParams.pedestal) {
+                    auto ground = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+                    auto wall = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+
+                    buildPlane(ground->vertices, ground->indices, 2.0, 2.0,
+                        exportParams.terrainSubdivision, exportParams.terrainSubdivision, true);
 
                     // Build walls
                     {
@@ -955,20 +968,12 @@ int vectiler(Params exportParams) {
                             }
                         }
                     }
-                }
 
-                /// Compute faces normals
-                if (exportParams.normals) {
-                    computeNormals(*mesh);
-                    computeNormals(*ground);
+                    ground->offset = offset;
+                    meshes.push_back(std::move(ground));
+                    wall->offset = offset;
+                    meshes.push_back(std::move(wall));
                 }
-
-                mesh->offset = offset;
-                meshes.push_back(std::move(mesh));
-                ground->offset = offset;
-                meshes.push_back(std::move(ground));
-                wall->offset = offset;
-                meshes.push_back(std::move(wall));
             }
         }
 

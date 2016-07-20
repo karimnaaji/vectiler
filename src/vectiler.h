@@ -23,6 +23,7 @@ struct Params {
     float roadsExtrusionWidth;
     bool normals;
     float buildingsHeight;
+    int pedestal;
 };
 
 #ifdef __cplusplus
