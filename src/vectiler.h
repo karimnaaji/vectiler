@@ -24,6 +24,7 @@ struct Params {
     bool normals;
     float buildingsHeight;
     int pedestal;
+    float pedestalHeight;
 };
 
 #ifdef __cplusplus

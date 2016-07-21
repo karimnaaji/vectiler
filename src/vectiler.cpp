@@ -440,7 +440,8 @@ void buildPedestalPlanes(const Tile& tile,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
     const std::unique_ptr<HeightData>& elevation,
-    unsigned int subdiv)
+    unsigned int subdiv,
+    float pedestalHeight)
 {
     float offset = 1.0 / subdiv;
     int vertexDataOffset = outVertices.size();
@@ -486,9 +487,9 @@ void buildPedestalPlanes(const Tile& tile,
             outVertices.push_back({v0, normalVector});
             v1.z = h1 * tile.invScale;
             outVertices.push_back({v1, normalVector});
-            v0.z = 0.0;
+            v0.z = pedestalHeight * tile.invScale;
             outVertices.push_back({v0, normalVector});
-            v1.z = 0.0;
+            v1.z = pedestalHeight * tile.invScale;
             outVertices.push_back({v1, normalVector});
 
             if (i == Border::right || i == Border::bottom) {
@@ -970,8 +971,12 @@ int vectiler(Params exportParams) {
                     buildPlane(ground->vertices, ground->indices, 2.0, 2.0,
                         exportParams.terrainSubdivision, exportParams.terrainSubdivision, true);
 
+                    for (auto& vertex : ground->vertices) {
+                        vertex.position.z = exportParams.pedestalHeight * tile.invScale;
+                    }
+
                     buildPedestalPlanes(tile, wall->vertices, wall->indices, textureData,
-                        exportParams.terrainSubdivision);
+                        exportParams.terrainSubdivision, exportParams.pedestalHeight);
 
                     ground->offset = offset;
                     meshes.push_back(std::move(ground));

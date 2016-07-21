@@ -15,6 +15,7 @@ int main(int argc, const char **argv) {
     int splitMeshes = 0;
     int append = 0;
     int pedestal = 0;
+    float pedestalHeight = 0.f;
     int terrain = 0;
     int terrainSubdivision = 64;
     float terrainExtrusionScale = 1.f;
@@ -43,6 +44,7 @@ int main(int argc, const char **argv) {
     flag_float(&buildingsExtrusionScale, "buildingsExtrusionScale", "Building height scale factor");
     flag_float(&buildingsHeight, "buildingsHeight", "The height at which building should be extruded (if no height data is available)");
     flag_int(&pedestal, "pedestal", "Build a pedestal when running with terrain option (Useful for 3d printing)");
+    flag_float(&pedestalHeight, "pedestalHeight", "Pedestal height, can be negative");
     flag_int(&terrain, "terrain", "Generate terrain elevation topography");
     flag_int(&terrainSubdivision, "terrainSubdivision", "Terrain mesh subdivision");
     flag_float(&terrainExtrusionScale, "terrainExtrusionScale", "Terrain mesh extrusion scale");
@@ -58,7 +60,8 @@ int main(int argc, const char **argv) {
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
-        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals, buildingsHeight, pedestal};
+        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals, buildingsHeight, pedestal,
+        pedestalHeight};
 
     if (!parameters.terrain && parameters.pedestal) {
         printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
