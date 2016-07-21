@@ -68,6 +68,8 @@ $ cmake --build build
     --buildings                Whether to export building geometry (1)
     --buildingsExtrusionScale  Building height scale factor (1.0)
     --buildingsHeight          The height at which building should be extruded (if no height data is available) (0.0)
+    --pedestal                 Build a pedestal when running with terrain option (Useful for 3d printing) (0)
+    --pedestalHeight           Pedestal height, can be negative (0.0)
     --terrain                  Generate terrain elevation topography (0)
     --terrainSubdivision       Terrain mesh subdivision (64)
     --terrainExtrusionScale    Terrain mesh extrusion scale (1.0)
