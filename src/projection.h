@@ -3,6 +3,7 @@
 #include "glm/glm.hpp"
 #include <cmath>
 #include <functional>
+#include <bitset>
 
 #define R_EARTH 6378137.0
 #define PI M_PI
@@ -15,10 +16,19 @@ glm::dvec2 pixelsToMeters(const glm::dvec2 _pix, const int _zoom, double _invTil
 glm::dvec4 tileBounds(int x, int y, int z, double _tileSize);
 glm::dvec2 tileCenter(int x, int y, int z, double _tileSize);
 
+enum Border {
+    right,
+    left,
+    bottom,
+    top,
+};
+
 struct Tile {
     int x;
     int y;
     int z;
+
+    std::bitset<4> borders;
 
     double invScale = 0.0;
     glm::dvec2 tileOrigin;
@@ -32,6 +42,7 @@ struct Tile {
         tileOrigin = glm::dvec2(0.5 * (bounds.x + bounds.z), -0.5 * (bounds.y + bounds.w));
         double scale = 0.5 * glm::abs(bounds.x - bounds.z);
         invScale = 1.0 / scale;
+        borders = 0;
     }
 };
 
