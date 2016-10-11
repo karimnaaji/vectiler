@@ -1023,9 +1023,32 @@ int vectiler(Params exportParams) {
 
                         if (exportParams.buildings) {
                             for (const Polygon& polygon : feature.polygons) {
-                                if (!withinTileRange(centroid(polygon))) {
-                                    continue;
+
+                                // Trim options
+                                {
+                                    bool trim = false;
+                                    for (int i = 0; i < tile.borders.size(); ++i) {
+                                        if (tile.borders[i]) {
+                                            if (exportParams.trimTileEdgesByCentroid && !withinTileRange(centroid(polygon))) {
+                                                trim = true;
+                                                goto skip;
+                                            } else if (exportParams.trimTileEdges) {
+                                                for (const auto line : polygon) {
+                                                    for (const auto point : line) {
+                                                        if (!withinTileRange(glm::vec2(point))) {
+                                                            trim = true;
+                                                            goto skip;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+skip:
+                                    if (trim) continue;
                                 }
+
                                 float centroidHeight = 0.f;
                                 if (minHeight != height) {
                                     centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,

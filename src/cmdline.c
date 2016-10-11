@@ -26,6 +26,8 @@ int main(int argc, const char **argv) {
     float roadsHeight = 1.f;
     float roadsExtrusionWidth = 5.f;
     int normals = 0;
+    int trimTileEdgesByCentroid = 0;
+    int trimTileEdges = 0;
     const char* name = NULL;
     const char* apiKey = "vector-tiles-qVaBcRA";
 
@@ -55,13 +57,15 @@ int main(int argc, const char **argv) {
     flag_float(&roadsHeight, "roadsHeight", "The roads height offset (z-axis)");
     flag_float(&roadsExtrusionWidth, "roadsExtrusionWidth", "The roads extrusion width");
     flag_int(&normals, "normals", "Export with normals");
+    flag_int(&trimTileEdgesByCentroid, "trimTileEdgesByCentroid", "Trim polygon data when centroid is out of the tile");
+    flag_int(&trimTileEdges, "trimTileEdges", "Trim polygon data when any point of the polygon is out of the tile");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
     struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
         (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
         terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
         (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals, buildingsHeight, pedestal,
-        pedestalHeight};
+        pedestalHeight, (bool)trimTileEdgesByCentroid, (bool)trimTileEdges};
 
     if (!parameters.terrain && parameters.pedestal) {
         printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");

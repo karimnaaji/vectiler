@@ -25,6 +25,8 @@ struct Params {
     float buildingsHeight;
     int pedestal;
     float pedestalHeight;
+    bool trimTileEdgesByCentroid;
+    bool trimTileEdges;
 };
 
 #ifdef __cplusplus
