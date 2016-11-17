@@ -26,7 +26,7 @@ $ git submodule update --init --recursive
 aobaker needs [embree](https://embree.github.io/) for optimal ray tracing and tbb, you can install it using [homebrew](http://brew.sh/):
 
 ```sh
-$ cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula
+$ cp embree.rb /usr/local/Homebrew/Library/Taps/homebrew/homebrew-core/Formula/
 $ brew install embree tbb cmake
 ```
 

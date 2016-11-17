@@ -42,9 +42,9 @@ if (VECTILER_AOBAKER)
         -I${TBB_PATH}/include
         -Wall)
 
-    link_directories(
-        ${EMBREE_PATH}/lib
-        ${TBB_PATH}/lib)
+    #link_directories(
+    #    ${EMBREE_PATH}/lib
+    #    ${TBB_PATH}/lib)
 
     include_directories(
         ${PROJECT_SOURCE_DIR}/3rdparty/aobaker/
