@@ -808,17 +808,17 @@ bool extractTileRange(int* start, int* end, const std::string& range) {
 }
 
 inline std::string vectorTileURL(const Tile& tile, const std::string& apiKey) {
-    return "http://vector.mapzen.com/osm/all/"
+    return "https://tile.mapzen.com/mapzen/vector/v1/all/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
         + std::to_string(tile.y) + ".json?api_key=" + apiKey;
 }
 
-inline std::string terrainURL(const Tile& tile) {
-    return "https://terrain-preview.mapzen.com/terrarium/"
+inline std::string terrainURL(const Tile& tile, const std::string& apiKey) {
+    return "https://tile.mapzen.com/mapzen/terrain/v1/terrarium/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
-        + std::to_string(tile.y) + ".png";
+        + std::to_string(tile.y) + ".png?api_key=" + apiKey;
 }
 
 int vectiler(Params exportParams) {
@@ -878,7 +878,7 @@ int vectiler(Params exportParams) {
 
         for (auto tile : tiles) {
             if (exportParams.terrain) {
-                std::string url = terrainURL(tile);
+                std::string url = terrainURL(tile, apiKey);
 
                 auto textureData = downloadHeightmapTile(url, tile,
                     exportParams.terrainExtrusionScale);
@@ -929,7 +929,7 @@ int vectiler(Params exportParams) {
 
         /// Build terrain mesh
         if (exportParams.terrain) {
-            url = terrainURL(tile);
+            url = terrainURL(tile, apiKey);
 
             const auto& textureData = heightData[tile];
 
