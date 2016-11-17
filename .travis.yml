@@ -14,7 +14,7 @@ matrix:
 
 before_install:
   - git submodule update --init --recursive
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp 3rdparty/aobaker/embree.rb /usr/local/Library/Formula ; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then cp embree.rb /usr/local/Homebrew/Library/Taps/homebrew/homebrew-core/Formula ; fi
   - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install embree tbb cmake ; fi
 
 script:
