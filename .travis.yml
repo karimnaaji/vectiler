@@ -14,7 +14,6 @@ matrix:
 
 before_install:
   - git submodule update --init --recursive
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install cmake ; fi
 
 script:
   - cmake . -Bbuild
