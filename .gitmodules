@@ -7,6 +7,3 @@
 [submodule "3rdparty/earcut.hpp"]
 	path = 3rdparty/earcut.hpp
 	url = https://github.com/mapbox/earcut.hpp.git
-[submodule "3rdparty/aobaker"]
-	path = 3rdparty/aobaker
-	url = https://github.com/prideout/aobaker.git

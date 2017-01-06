@@ -9,9 +9,6 @@ struct Params {
     int tilez;
     float offset[2];
     bool splitMesh;
-    int aoSizeHint;
-    int aoSamples;
-    bool aoBaking;
     bool append;
     bool terrain;
     int terrainSubdivision;

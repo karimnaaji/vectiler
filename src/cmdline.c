@@ -9,9 +9,6 @@ int main(int argc, const char **argv) {
     int tileZ = 16;
     float offsetX = 0.f;
     float offsetY = 0.f;
-    int aoAtlasSize = 512;
-    int aoSamples = 256;
-    int aoBaking = 0;
     int splitMeshes = 0;
     int append = 0;
     int pedestal = 0;
@@ -48,28 +45,37 @@ int main(int argc, const char **argv) {
     flag_int(&terrain, "terrain", "Generate terrain elevation topography");
     flag_int(&terrainSubdivision, "terrainSubdivision", "Terrain mesh subdivision");
     flag_float(&terrainExtrusionScale, "terrainExtrusionScale", "Terrain mesh extrusion scale");
-    flag_int(&aoBaking, "aoBaking", "Generate ambiant occlusion baked atlas");
-    flag_int(&aoAtlasSize, "aoAtlasSize", "Controls resolution of atlas");
-    flag_int(&aoSamples, "aoSamples", "Number of samples for ambient occlusion");
     flag_int(&roads, "roads", "Whether to export roads geometry");
     flag_float(&roadsHeight, "roadsHeight", "The roads height offset (z-axis)");
     flag_float(&roadsExtrusionWidth, "roadsExtrusionWidth", "The roads extrusion width");
     flag_int(&normals, "normals", "Export with normals");
     flag_parse(argc, argv, "v" "0.1.0", 0);
 
-    struct Params parameters = {&name[0], &apiKey[0], tileX, tileY, tileZ, {offsetX, offsetY},
-        (bool)splitMeshes, aoAtlasSize, aoSamples, (bool)aoBaking, (bool)append, (bool)terrain,
-        terrainSubdivision, terrainExtrusionScale, (bool)buildings, buildingsExtrusionScale,
-        (bool)roads, roadsHeight, roadsExtrusionWidth, (bool)normals, buildingsHeight, pedestal,
-        pedestalHeight};
+    struct Params parameters = {
+        &name[0],
+        &apiKey[0],
+        tileX,
+        tileY,
+        tileZ,
+        {offsetX, offsetY},
+        (bool)splitMeshes,
+        (bool)append,
+        (bool)terrain,
+        terrainSubdivision,
+        terrainExtrusionScale,
+        (bool)buildings,
+        buildingsExtrusionScale,
+        (bool)roads,
+        roadsHeight,
+        roadsExtrusionWidth,
+        (bool)normals,
+        buildingsHeight,
+        pedestal,
+        pedestalHeight
+    };
 
     if (!parameters.terrain && parameters.pedestal) {
         printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
-        return EXIT_FAILURE;
-    }
-
-    if (parameters.aoBaking && (parameters.terrain || parameters.roads)) {
-        printf("Ambient occlusion baking not yet available when exporting with option --terrain or --roads\n");
         return EXIT_FAILURE;
     }
 

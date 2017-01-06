@@ -16,24 +16,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
-#ifdef AOBAKER
-#include "aobaker.h"
-#else
-int aobaker_bake(
-    char const* inputmesh,
-    char const* outputmesh,
-    char const* outputatlas,
-    int sizehint,
-    int nsamples,
-    bool gbuffer,
-    bool chartinfo,
-    float multiply)
-{
-    printf("WARNING -- Vectiler was built without ao baker\n");
-    return 0;
-}
-#endif
-
 #define EPSILON 1e-5f
 
 struct PolygonVertex {
@@ -1145,73 +1127,6 @@ int vectiler(Params exportParams) {
 
     if (!saved) {
         return EXIT_FAILURE;
-    }
-
-    // Bake ambiant occlusion using AO Baker
-    if (exportParams.aoBaking) {
-        std::string aoFile = outFile + "-ao.obj";
-        std::string aoImageFile = outFile + ".png";
-        std::string aoMaterialFile = outFile + ".mtl";
-
-        bool aoBaked = aobaker_bake(outputOBJ.c_str(), aoFile.c_str(), aoImageFile.c_str(),
-            exportParams.aoSizeHint, exportParams.aoSamples,
-            false,  // g-buffers
-            false,  // charinfo
-            1.0);   // multiply
-
-        bool success = aoBaked;
-        std::string aoFileData;
-
-        {
-            std::ifstream ifile(aoFile);
-            success &= ifile.is_open();
-
-            if (success) {
-                aoFileData = std::string((std::istreambuf_iterator<char>(ifile)),
-                        (std::istreambuf_iterator<char>()));
-                ifile.close();
-            }
-        }
-
-        // Inject material to wavefront
-        {
-            std::ofstream ofile(aoFile);
-            success &= ofile.is_open();
-
-            if (success) {
-                std::string materialHeader;
-                materialHeader += "mtllib " + aoMaterialFile + "\n";
-                materialHeader += "usemtl tile_mtl\n\n";
-                ofile << materialHeader;
-                ofile << aoFileData;
-                ofile.close();
-            }
-        }
-
-
-        // Export material properties
-        {
-            std::ofstream materialfile(aoMaterialFile);
-            success &= materialfile.is_open();
-
-            if (success) {
-                printf("Saving material file %s\n", aoMaterialFile.c_str());
-                std::string material = R"END(
-                    newmtl tile_mtl
-                    Ka 0.0000 0.0000 0.0000
-                    Kd 1.0000 1.0000 1.0000
-                    Ks 0.0000 0.0000 0.0000
-                    d 1.0
-                    map_Kd )END";
-                material += aoImageFile;
-                materialfile << material;
-                materialfile.close();
-            }
-        }
-
-        if (!success) {
-            return EXIT_FAILURE;
-        }
     }
 
     return EXIT_SUCCESS;
