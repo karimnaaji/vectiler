@@ -25,14 +25,20 @@ foreach(_headerFile ${HEADERS})
 endforeach()
 list(REMOVE_DUPLICATES INCLUDE_DIRS)
 
-find_package(CURL)
+set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/platform)
 
-if(CURL_FOUND)
-    set(INCLUDE_DIRS ${INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
-    set(LIBS ${LIBS} ${CURL_LIBRARIES})
-else(CURL_FOUND)
-    message(FATAL_ERROR "Could not find the CURL library and development files.")
-endif(CURL_FOUND)
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(VECTILER_SOURCES ${VECTILER_SOURCES} ${PROJECT_SOURCE_DIR}/platform/windows_httpget.cpp)
+else()
+    find_package(CURL)
+    if(CURL_FOUND)
+        set(INCLUDE_DIRS ${INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
+        set(VECTILER_LIBS ${VECTILER_LIBS} ${CURL_LIBRARIES})
+        set(VECTILER_SOURCES ${VECTILER_SOURCES} ${PROJECT_SOURCE_DIR}/platform/curl_httpget.cpp)
+    else()
+        message(FATAL_ERROR "Could not find the CURL library and development files.")
+    endif()
+endif()
 
 set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/glm)
 set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/rapidjson/include)
@@ -40,14 +46,14 @@ set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/earcut.hpp/inclu
 set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/flag)
 
 include_directories(${INCLUDE_DIRS})
-
 add_library(vectiler ${VECTILER_SOURCES})
-
 add_executable(vectiler.out ${C_SOURCES})
 
-set(VECTILER_LIBS ${LIBS})
-
-target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler -lcurl)
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
+else()
+    target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler -lcurl)
+endif()
 
 # if (BUILD_TESTS)
 #     message(STATUS "Build unit tests")

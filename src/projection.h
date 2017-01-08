@@ -4,12 +4,15 @@
 #include <cmath>
 #include <functional>
 #include <bitset>
+#include <cmath>
 
 #define R_EARTH 6378137.0
-#define PI M_PI
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 constexpr static double INV_360 = 1.0 / 360.0;
 constexpr static double INV_180 = 1.0 / 180.0;
-constexpr static double HALF_CIRCUMFERENCE = PI * R_EARTH;
+constexpr static double HALF_CIRCUMFERENCE = M_PI * R_EARTH;
 
 glm::dvec2 lonLatToMeters(const glm::dvec2 _lonLat);
 glm::dvec2 pixelsToMeters(const glm::dvec2 _pix, const int _zoom, double _invTileSize);
