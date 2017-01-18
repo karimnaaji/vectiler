@@ -3,7 +3,7 @@
 glm::dvec2 lonLatToMeters(const glm::dvec2 _lonLat) {
     glm::dvec2 meters;
     meters.x = _lonLat.x * HALF_CIRCUMFERENCE * INV_180;
-    meters.y = log(tan(PI * 0.25 + _lonLat.y * PI * INV_360)) * (double)R_EARTH;
+    meters.y = log(tan(M_PI * 0.25 + _lonLat.y * M_PI * INV_360)) * (double)R_EARTH;
     return meters;
 }
 

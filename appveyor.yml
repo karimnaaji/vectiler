@@ -1,0 +1,10 @@
+# https://ci.appveyor.com/project/karimnaaji/vectiler
+---
+before_build:
+    - git submodule update --init --recursive
+build_script:
+    - mkdir build
+    - cd build
+    - cmake .. -G "Visual Studio 14 2015 Win64"
+    - cmake --build .
+

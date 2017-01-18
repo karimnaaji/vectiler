@@ -1,5 +1,4 @@
 #include <iostream>
-#include <curl/curl.h>
 #include <string>
 #include <sstream>
 #include <fstream>
@@ -12,6 +11,7 @@
 #include "tiledata.h"
 #include "vectiler.h"
 #include "earcut.h"
+#include "platform.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -34,45 +34,6 @@ struct PolygonMesh {
     std::vector<PolygonVertex> vertices;
     glm::vec2 offset;
 };
-
-static size_t writeData(void* ptr, size_t size, size_t nmemb, void *stream) {
-    ((std::stringstream*) stream)->write(reinterpret_cast<char*>(ptr), size * nmemb);
-    return size * nmemb;
-}
-
-bool downloadData(std::stringstream& out, const std::string& url) {
-    static bool curlInitialized = false;
-    static CURL* curlHandle = nullptr;
-
-    if (!curlInitialized) {
-        curl_global_init(CURL_GLOBAL_DEFAULT);
-        curlHandle = curl_easy_init();
-        curlInitialized = true;
-
-        // set up curl to perform fetch
-        curl_easy_setopt(curlHandle, CURLOPT_WRITEFUNCTION, writeData);
-        curl_easy_setopt(curlHandle, CURLOPT_HEADER, 0L);
-        curl_easy_setopt(curlHandle, CURLOPT_VERBOSE, 0L);
-        curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
-        curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
-        curl_easy_setopt(curlHandle, CURLOPT_DNS_CACHE_TIMEOUT, -1);
-    }
-
-    curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &out);
-    curl_easy_setopt(curlHandle, CURLOPT_URL, url.c_str());
-
-    printf("URL request: %s", url.c_str());
-
-    CURLcode result = curl_easy_perform(curlHandle);
-
-    if (result != CURLE_OK) {
-        printf(" -- Failure: %s\n", curl_easy_strerror(result));
-    } else {
-        printf(" -- OK\n");
-    }
-
-    return result == CURLE_OK && out.rdbuf()->in_avail();
-}
 
 void computeNormals(PolygonMesh& mesh) {
     for (size_t i = 0; i < mesh.indices.size(); i += 3) {
@@ -100,15 +61,15 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
     const Tile& tile,
     float extrusionScale)
 {
-    std::stringstream out;
+    std::string out;
 
     if (downloadData(out, url)) {
         unsigned char* pixels;
         int width, height, comp;
 
         // Decode texture PNG
-        const unsigned char* pngData = reinterpret_cast<const unsigned char*>(out.str().c_str());
-        pixels = stbi_load_from_memory(pngData, out.str().length(), &width, &height, &comp,
+        const unsigned char* pngData = reinterpret_cast<const unsigned char*>(out.c_str());
+        pixels = stbi_load_from_memory(pngData, out.length(), &width, &height, &comp,
             STBI_rgb_alpha);
 
         // printf("Texture data %d width, %d height, %d comp\n", width, height, comp);
@@ -152,12 +113,12 @@ std::unique_ptr<HeightData> downloadHeightmapTile(const std::string& url,
 }
 
 std::unique_ptr<TileData> downloadTile(const std::string& url, const Tile& tile) {
-    std::stringstream out;
+    std::string out;
 
     if (downloadData(out, url)) {
         // parse written data into a JSON object
         rapidjson::Document doc;
-        doc.Parse(out.str().c_str());
+        doc.Parse(out.c_str());
 
         if (doc.HasParseError()) {
             printf("Error parsing tile\n");
