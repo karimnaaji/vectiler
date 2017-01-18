@@ -1,6 +1,9 @@
 # vectiler
 
-[![Build Status](https://travis-ci.org/karimnaaji/vectiler.svg?branch=master)](https://travis-ci.org/karimnaaji/vectiler)
+|Platform|Build Status|
+|--------|------|
+|OS X/Linux|[![Build Status](https://travis-ci.org/karimnaaji/vectiler.svg?branch=master)](https://travis-ci.org/karimnaaji/vectiler)|
+|Windows|[![Build status](https://ci.appveyor.com/api/projects/status/985uxs6rk8044ols/branch/master?svg=true)](https://ci.appveyor.com/project/karimnaaji/vectiler/branch/master)|
 
 A wavefront obj vector tile builder and exporter based on [mapzen](https://mapzen.com) [vector tiles](https://mapzen.com/projects/vector-tiles).
 
@@ -33,16 +36,25 @@ To build vectiler you will need a compiler that supports `c++11`, for example wi
 ```
 $ sudo add-apt-repository ppa:ubuntu-toolchain-r/test
 $ sudo apt-get update
-# install curl/g++/cmake
 $ sudo apt-get install g++-4.9 cmake libcurl4-openssl-dev
 ```
 
-**build**
+**build (OS X/Linux)**
 
 To build with cmake in a `build/` directory run the following:
 ```sh
 $ cmake . -Bbuild
 $ cmake --build build
+```
+
+**build (Windows)**
+
+First install CMake for Windows and then run the following commands in a command line tool like MinGW:
+```sh
+$ mkdir build
+$ cd build
+$ cmake .. -G "Visual Studio 14 2015 Win64" 
+$ cmake --build .
 ```
 
 **usage**
