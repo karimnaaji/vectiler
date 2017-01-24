@@ -28,8 +28,10 @@ list(REMOVE_DUPLICATES INCLUDE_DIRS)
 set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/platform)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    set(EXECUTABLE_NAME vectiler)
     set(VECTILER_SOURCES ${VECTILER_SOURCES} ${PROJECT_SOURCE_DIR}/platform/windows_httpget.cpp)
 else()
+    set(EXECUTABLE_NAME vectiler.out)
     find_package(CURL)
     if(CURL_FOUND)
         set(INCLUDE_DIRS ${INCLUDE_DIRS} ${CURL_INCLUDE_DIR})
@@ -46,13 +48,13 @@ set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/earcut.hpp/inclu
 set(INCLUDE_DIRS ${INCLUDE_DIRS} ${PROJECT_SOURCE_DIR}/3rdparty/flag)
 
 include_directories(${INCLUDE_DIRS})
-add_library(vectiler ${VECTILER_SOURCES})
-add_executable(vectiler.out ${C_SOURCES})
+add_library(vectiler_core ${VECTILER_SOURCES})
+add_executable(${EXECUTABLE_NAME} ${C_SOURCES})
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler)
+    target_link_libraries(${EXECUTABLE_NAME} ${VECTILER_LIBS} vectiler_core)
 else()
-    target_link_libraries(vectiler.out ${VECTILER_LIBS} vectiler -lcurl)
+    target_link_libraries(${EXECUTABLE_NAME} ${VECTILER_LIBS} vectiler_core -lcurl)
 endif()
 
 # if (BUILD_TESTS)
