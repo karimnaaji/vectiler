@@ -13,8 +13,8 @@ A wavefront obj vector tile builder and exporter based on [mapzen](https://mapze
 
 **export example**
 
-- https://sketchfab.com/models/e7ee1c0047ce4b5dbc768adcf7a7264e
-- https://sketchfab.com/models/693df3f9180942fba3f865e0d5ddc0ce
+- [sketchfab.com/e7ee1c](https://sketchfab.com/models/e7ee1c0047ce4b5dbc768adcf7a7264e)
+- [sketchfab.com/693df3](https://sketchfab.com/models/693df3f9180942fba3f865e0d5ddc0ce)
 
 **fetch submodules**
 
@@ -90,21 +90,9 @@ $ cmake --build .
 
 **terrain**
 
-Terrain export:
+Terrain export is only available over zoom 15 (`--tilez`):
 
 ```sh
 $ ./vectiler --tilex 5242/5260 --tiley 12642/12666 --tilez 15 --terrain 1 --buildings 1 --terrainExtrusionScale 1.5 --buildingsExtrusionScale 1.9
 ```
 ![](img/terrain2.png)
-
-**buildings**
-
-Download one tile with ambiant occlusion baked in a texture:
-```sh
-$ ./vectiler --tilex 19294 --tiley 24642 --tilez 16 --sizehint 512 --nsamples 128
-```
-
-Download a _big_ tile, in a file named `manhattan.obj` from a shell script:
-```sh
-$ ./vectiler --name manhattan --tilex 19293/19298 --tiley 24639/24643
-```
