@@ -269,6 +269,74 @@ void buildPlane(std::vector<PolygonVertex>& outVertices,
     }
 }
 
+Polygon clipPolygon(const Polygon& polygon) {
+    std::vector<Line> outPolygon;
+
+    struct Edge {
+        glm::vec2 p0;
+        glm::vec2 p1;
+    };
+
+    Edge edges[4] = {
+        {{-1.0f, -1.0f}, {-1.0f,  1.0f}},
+        {{-1.0f,  1.0f}, { 1.0f,  1.0f}},
+        {{ 1.0f,  1.0f}, { 1.0f, -1.0f}},
+        {{ 1.0f, -1.0f}, {-1.0f, -1.0f}},
+    };
+
+    auto cross2d = [](glm::vec2 a, glm::vec2 b) -> float {
+        return a.x * b.y - a.y * b.x;
+    };
+
+    auto isRightSide = [=](Edge e, glm::vec2 p) -> bool {
+        return cross2d(e.p1 - e.p0, p - e.p0) < 0.0f;
+    };
+
+    // http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+    auto intersection = [=](Edge e0, Edge e1) -> glm::vec2 {
+        glm::vec2 q = e0.p0;
+        glm::vec2 s = e0.p1 - e0.p0;
+        glm::vec2 p = e1.p0;
+        glm::vec2 r = e1.p1 - e1.p0;
+        float u = cross2d(q - p, r) / cross2d(r, s);
+        return q + u * s;
+    };
+    
+    for (const auto& line : polygon) {
+        Line currentPolygon = line;
+        Line clippedPolygon;
+        for (int i = 0; i < 4; ++i) {
+            if (currentPolygon.size() == 0) { continue; }
+            for (auto it = currentPolygon.begin(); it != currentPolygon.end() - 1; ++it) {
+                glm::vec2 p0 = glm::vec2(*it);
+                glm::vec2 p1 = glm::vec2(*(it + 1));
+
+                if (isRightSide(edges[i], p0)) {
+                    if (isRightSide(edges[i], p1)) {
+                        clippedPolygon.push_back(glm::vec3(p1, 0.0f));
+                    } else {
+                        clippedPolygon.push_back(glm::vec3(intersection(Edge{p0, p1}, edges[i]), 0.0));
+                    }
+                } else {
+                    if (isRightSide(edges[i], glm::vec2(p1))) {
+                        clippedPolygon.push_back(glm::vec3(intersection(Edge{p0, p1}, edges[i]), 0.0));
+                        clippedPolygon.push_back(glm::vec3(p1, 0.0f));
+                    }
+                }
+            }
+            if (clippedPolygon.size() > 0 && clippedPolygon.front() != clippedPolygon.back()) {
+                clippedPolygon.push_back(clippedPolygon.front());
+            }
+            currentPolygon = clippedPolygon;
+            clippedPolygon.clear();
+        }
+        if (currentPolygon.size() > 0) {
+            outPolygon.push_back(currentPolygon);
+        }
+    }
+    return outPolygon;
+}
+
 float buildPolygonExtrusion(const Polygon& polygon,
     double minHeight,
     double height,
@@ -965,8 +1033,12 @@ int vectiler(Params exportParams) {
                         auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
 
                         if (exportParams.buildings) {
-                            for (const Polygon& polygon : feature.polygons) {
+                            for (Polygon& polygon : feature.polygons) {
                                 float centroidHeight = 0.f;
+                                if (exportParams.clip) {
+                                     polygon = clipPolygon(polygon);
+                                     if (polygon.size() == 0) { continue; }
+                                }
                                 if (minHeight != height) {
                                     centroidHeight = buildPolygonExtrusion(polygon, minHeight, height,
                                         mesh->vertices, mesh->indices, textureData, tile.invScale);
@@ -1035,6 +1107,13 @@ int vectiler(Params exportParams) {
                                 polygonLine.push_back(polygonLine[0]);
 
                                 size_t offset = mesh->vertices.size();
+
+                                if (exportParams.clip) {
+                                    polygon = clipPolygon(polygon);
+                                    if (polygon.size() == 0) {
+                                        continue;
+                                    }
+                                }
 
                                 if (exportParams.roadsHeight > 0) {
                                     buildPolygonExtrusion(polygon, 0.0, exportParams.roadsHeight * tile.invScale,
