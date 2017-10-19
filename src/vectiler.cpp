@@ -447,6 +447,33 @@ void buildPolygon(const Polygon& polygon,
     }
 }
 
+void buildUnderneathPlane(const Tile& tile,
+    std::vector<PolygonVertex>& outVertices,
+    std::vector<unsigned int>& outIndices)
+{
+    int vertexDataOffset = outVertices.size();
+
+    static const glm::vec3 normalVector(0.0, -1.0, 0.0);
+    glm::vec3 v0, v1, v2, v3;
+
+    v0 = glm::vec3(-1.0, -1.0, 0.0);
+    v1 = glm::vec3(-1.0, 1.0, 0.0);
+    v2 = glm::vec3(1.0, 1.0, 0.0);
+    v3 = glm::vec3(1.0, -1.0, 0.0);
+
+    outVertices.push_back({v0, normalVector});
+    outVertices.push_back({v1, normalVector});
+    outVertices.push_back({v2, normalVector});
+    outVertices.push_back({v3, normalVector});
+
+    outIndices.push_back(vertexDataOffset+0);
+    outIndices.push_back(vertexDataOffset+1);
+    outIndices.push_back(vertexDataOffset+3);
+    outIndices.push_back(vertexDataOffset+1);
+    outIndices.push_back(vertexDataOffset+2);
+    outIndices.push_back(vertexDataOffset+3);
+}
+
 void buildPedestalPlanes(const Tile& tile,
     std::vector<PolygonVertex>& outVertices,
     std::vector<unsigned int>& outIndices,
@@ -995,6 +1022,13 @@ int vectiler(Params exportParams) {
                     meshes.push_back(std::move(wall));
                 }
             }
+        }
+
+        {
+            auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
+            buildUnderneathPlane(tile, mesh->vertices, mesh->indices);
+            mesh->offset = offset;
+            meshes.push_back(std::move(mesh));
         }
 
         /// Build vector tile mesh
