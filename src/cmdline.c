@@ -77,10 +77,10 @@ int main(int argc, const char **argv) {
         (bool)clip
     };
 
-    if (!parameters.terrain && parameters.pedestal) {
-        printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
-        return EXIT_FAILURE;
-    }
+    // if (!parameters.terrain && parameters.pedestal) {
+    //     printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
+    //     return EXIT_FAILURE;
+    // }
 
     if (parameters.terrain && tileZ >= 15) {
         printf("Terrain tile zoom can only go up to 15\n");
