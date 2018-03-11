@@ -24,7 +24,7 @@ int main(int argc, const char **argv) {
     float roadsExtrusionWidth = 5.f;
     int normals = 0;
     const char* name = NULL;
-    const char* apiKey = "vector-tiles-qVaBcRA";
+    const char* apiKey = "xwlF66_oRKWWb058St_Q9Q";
 
     // Parse params
     flag_usage("[options]");

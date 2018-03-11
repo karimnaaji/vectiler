@@ -751,14 +751,14 @@ bool extractTileRange(int* start, int* end, const std::string& range) {
 }
 
 inline std::string vectorTileURL(const Tile& tile, const std::string& apiKey) {
-    return "https://tile.mapzen.com/mapzen/vector/v1/all/"
+    return "https://tile.nextzen.org/tilezen/vector/v1/256/all/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
         + std::to_string(tile.y) + ".json?api_key=" + apiKey;
 }
 
 inline std::string terrainURL(const Tile& tile, const std::string& apiKey) {
-    return "https://tile.mapzen.com/mapzen/terrain/v1/terrarium/"
+    return "https://tile.nextzen.org/tilezen/terrain/v1/256/terrarium/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
         + std::to_string(tile.y) + ".png?api_key=" + apiKey;
