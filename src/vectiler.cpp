@@ -301,7 +301,7 @@ Polygon clipPolygon(const Polygon& polygon) {
         float u = cross2d(q - p, r) / cross2d(r, s);
         return q + u * s;
     };
-    
+
     for (const auto& line : polygon) {
         Line currentPolygon = line;
         Line clippedPolygon;
