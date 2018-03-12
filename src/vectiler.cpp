@@ -758,7 +758,7 @@ inline std::string vectorTileURL(const Tile& tile, const std::string& apiKey) {
 }
 
 inline std::string terrainURL(const Tile& tile, const std::string& apiKey) {
-    return "https://tile.nextzen.org/tilezen/terrain/v1/256/terrarium/"
+    return "https://tile.nextzen.org/tilezen/terrain/v1/260/terrarium/"
         + std::to_string(tile.z) + "/"
         + std::to_string(tile.x) + "/"
         + std::to_string(tile.y) + ".png?api_key=" + apiKey;
