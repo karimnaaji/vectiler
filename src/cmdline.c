@@ -24,6 +24,7 @@ int main(int argc, const char **argv) {
     float roadsExtrusionWidth = 5.f;
     int normals = 0;
     int clip = 0;
+    int buildUnderneathPlane = 0;
     const char* name = NULL;
     const char* apiKey = "xwlF66_oRKWWb058St_Q9Q";
 
@@ -46,6 +47,7 @@ int main(int argc, const char **argv) {
     flag_int(&terrain, "terrain", "Generate terrain elevation topography");
     flag_int(&terrainSubdivision, "terrainSubdivision", "Terrain mesh subdivision");
     flag_float(&terrainExtrusionScale, "terrainExtrusionScale", "Terrain mesh extrusion scale");
+    flag_int(&buildUnderneathPlane, "buildUnderneathPlane", "Build underneathPlane");
     flag_int(&roads, "roads", "Whether to export roads geometry");
     flag_float(&roadsHeight, "roadsHeight", "The roads height offset (z-axis)");
     flag_float(&roadsExtrusionWidth, "roadsExtrusionWidth", "The roads extrusion width");
@@ -74,13 +76,14 @@ int main(int argc, const char **argv) {
         buildingsHeight,
         pedestal,
         pedestalHeight,
-        (bool)clip
+        (bool)clip,
+        (bool)buildUnderneathPlane
     };
 
-    // if (!parameters.terrain && parameters.pedestal) {
-    //     printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
-    //     return EXIT_FAILURE;
-    // }
+    if (!parameters.terrain && parameters.pedestal) {
+        printf("Pedestal parameters can only be given when exporting with terrain (--terrain)\n");
+        return EXIT_FAILURE;
+    }
 
     if (parameters.terrain && tileZ >= 15) {
         printf("Terrain tile zoom can only go up to 15\n");

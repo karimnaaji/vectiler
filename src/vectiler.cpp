@@ -1024,7 +1024,7 @@ int vectiler(Params exportParams) {
             }
         }
 
-        {
+        if (exportParams.buildUnderneathPlane) {
             auto mesh = std::unique_ptr<PolygonMesh>(new PolygonMesh);
             buildUnderneathPlane(tile, mesh->vertices, mesh->indices);
             mesh->offset = offset;
