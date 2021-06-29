@@ -26,6 +26,7 @@ bool downloadData(std::string& out, const std::string& url) {
         curl_easy_setopt(curlHandle, CURLOPT_ACCEPT_ENCODING, "gzip");
         curl_easy_setopt(curlHandle, CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(curlHandle, CURLOPT_DNS_CACHE_TIMEOUT, -1);
+        curl_easy_setopt(curlHandle, CURLOPT_USERAGENT, "vectiler");
     }
 
     curl_easy_setopt(curlHandle, CURLOPT_WRITEDATA, &stream);
