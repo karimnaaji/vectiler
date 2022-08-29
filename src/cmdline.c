@@ -29,7 +29,7 @@ int main(int argc, const char **argv) {
     // Parse params
     flag_usage("[options]");
     flag_string(&name, "name", "File name");
-    flag_string(&apiKey, "apikey", "Developer API key (https://mapzen.com/developers/)");
+    flag_string(&apiKey, "apikey", "Nextzen Developer API key (https://developers.nextzen.org/)");
     flag_int(&splitMeshes, "splitMeshes", "Generate one mesh per feature in wavefront file");
     flag_string(&tileX, "tilex", "Tile X (can be a tile range: 19294/19295)");
     flag_string(&tileY, "tiley", "Tile Y (can be a tile range: 24642/24643)");

@@ -42,9 +42,9 @@ $ sudo apt-get install g++-4.9 cmake libcurl4-openssl-dev
 **build (OS X/Linux)**
 
 To build with cmake in a `build/` directory run the following:
-```sh
-$ cmake . -Bbuild
-$ cmake --build build
+```shell
+cmake . -Bbuild
+cmake --build build
 ```
 
 **build (Windows)**
@@ -53,7 +53,7 @@ First install CMake for Windows and then run the following commands in a command
 ```sh
 $ mkdir build
 $ cd build
-$ cmake .. -G "Visual Studio 14 2015 Win64" 
+$ cmake .. -G "Visual Studio 14 2015 Win64"
 $ cmake --build .
 ```
 
@@ -64,7 +64,7 @@ $ cmake --build .
 
   Options:
     --name                     File name ((null))
-    --apikey                   Developer API key (https://mapzen.com/developers/) (vector-tiles-qVaBcRA)
+    --apikey                   Nextzen Developer API key (https://developers.nextzen.org/)
     --splitMeshes              Generate one mesh per feature in wavefront file (0)
     --tilex                    Tile X (can be a tile range: 19294/19295) (19294)
     --tiley                    Tile Y (can be a tile range: 24642/24643) (24642)
